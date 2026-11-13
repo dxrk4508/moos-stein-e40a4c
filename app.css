@@ -9,7 +9,7 @@
    Einheiten nach Datum. Der Körper-Reiter hält Gewicht, Umfänge und Eckdaten, Banner erinnern. */
 :root{
   --bg:#ECEFEC; --surface:#FFFFFF; --surface-2:#F3F5F3; --ink:#131A17; --ink-2:#55615B; --line:#D6DCD8;
-  --plate-a:#1F5FBF; --plate-b:#C2392F; --on-accent:#FFFFFF; --ok:#1D7A49; --err:#B3261E; --warn:#A65F00;
+  --plate-a:#1F5FBF; --plate-b:#C2392F; --plate-c:#1E8A66; --on-accent:#FFFFFF; --ok:#1D7A49; --err:#B3261E; --warn:#A65F00;
   --accent:var(--plate-a);
   --f-display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
   --f-body:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
@@ -17,13 +17,13 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0F1311; --surface:#171D1A; --surface-2:#1E2522; --ink:#E8EEEA; --ink-2:#9AA6A0; --line:#2C3531;
-    --plate-a:#6B9DF2; --plate-b:#F07A71; --on-accent:#0B0F14; --ok:#5CC38B; --err:#FF8A80; --warn:#F2B35E;
+    --plate-a:#6B9DF2; --plate-b:#F07A71; --plate-c:#5CC9A5; --on-accent:#0B0F14; --ok:#5CC38B; --err:#FF8A80; --warn:#F2B35E;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F1311; --surface:#171D1A; --surface-2:#1E2522; --ink:#E8EEEA; --ink-2:#9AA6A0; --line:#2C3531;
-  --plate-a:#6B9DF2; --plate-b:#F07A71; --on-accent:#0B0F14; --ok:#5CC38B; --err:#FF8A80; --warn:#F2B35E;
+  --plate-a:#6B9DF2; --plate-b:#F07A71; --plate-c:#5CC9A5; --on-accent:#0B0F14; --ok:#5CC38B; --err:#FF8A80; --warn:#F2B35E;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -35,7 +35,9 @@ body{
 }
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--bg)}
 .app{max-width:640px;margin:0 auto;--tint:color-mix(in srgb,var(--accent) 9%,var(--surface))}
-.app[data-plan="B"]{--accent:var(--plate-b)}
+.app[data-plan="B"],.app[data-plan="push"]{--accent:var(--plate-b)}
+.app[data-plan="leg"]{--accent:var(--plate-c)}
+.app[data-plan="T"]{--accent:var(--ink)}
 .app[data-plan="H"],.app[data-plan="K"],.app[data-plan="E"]{--accent:var(--ink)}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -52,25 +54,27 @@ h1{margin:0;font:700 34px/1 var(--f-display);letter-spacing:.02em;text-transform
 
 [hidden]{display:none!important}
 .plans{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:14px}
-#tab-A,#tab-B,#tab-H{grid-column:span 2}
+#tab-T,#tab-H{grid-column:span 2}
 #tab-K,#tab-E{grid-column:span 3}
 .plan{
   --c:var(--plate-a);
   display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;padding:9px 4px;min-width:0;
   background:var(--surface);border:1px solid var(--line);border-radius:12px;
 }
-#tab-B{--c:var(--plate-b)}
-#tab-H,#tab-K,#tab-E{--c:var(--ink-2)}
+#tab-T,#tab-H,#tab-K,#tab-E{--c:var(--ink-2)}
 .plan[aria-pressed="true"]{border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c);background:color-mix(in srgb,var(--c) 8%,var(--surface))}
 .pA{--c:var(--plate-a)}
-.pB{--c:var(--plate-b)}
+.pB,.ppush{--c:var(--plate-b)}
+.ppull{--c:var(--plate-a)}
+.pleg{--c:var(--plate-c)}
+.picker{margin-bottom:14px}
 .plate{
   flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
   border:5px solid var(--c);background:var(--surface);
   font:700 17px/1 var(--f-display);
 }
 .dhead .plate,.hitem .plate{width:40px;height:40px;font-size:19px}
-#tab-H .plate,#tab-K .plate,#tab-E .plate{color:var(--ink-2)}
+#tab-T .plate,#tab-H .plate,#tab-K .plate,#tab-E .plate{color:var(--ink-2)}
 .ptxt{min-width:0;display:flex;flex-direction:column;align-items:center}
 .ptxt b{font-weight:600;font-size:13px;overflow-wrap:anywhere}
 .ptxt small{color:var(--ink-2);font-size:10.5px;line-height:1.25;overflow-wrap:anywhere}
@@ -337,3 +341,4 @@ select.fin{
 @media (prefers-reduced-motion: no-preference){
   .plan,.btn-new,.btn-sec{transition:background-color .15s,border-color .15s}
 }
+.picker .plan{grid-column:span 2}

@@ -2,6 +2,25 @@
   'use strict';
 
   var PLANS = {
+    push: { name:'Push', ex:[
+      {k:'brustpresse',    n:'Brustpresse',    warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'schulterpresse', n:'Schulterpresse', warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'butterfly',      n:'Butterfly',      warm:1, opt:false, rep:'12–15', hi:15, pause:'1,5 Min'},
+      {k:'trizepsdruecken',n:'Trizepsdrücken', warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'}
+    ]},
+    pull: { name:'Pull', ex:[
+      {k:'latzug',      n:'Latzug',       warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'rudern',      n:'Rudern',       warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'bizeps-curls',n:'Bizeps Curls', warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'}
+    ]},
+    leg: { name:'Leg', ex:[
+      {k:'beinpresse',  n:'Beinpresse',      warm:2, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'bein-beuger', n:'Bein Beuger',     warm:1, opt:false, rep:'10–12', hi:12, pause:'1,5 Min'},
+      {k:'pendelsquats',n:'Pendulum Squats', warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'wadenheben',  n:'Wadenheben',      warm:1, opt:false, rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'plank',       n:'Plank',           warm:0, opt:false, rep:'20–40 Sek.', hi:40, pause:'45–60 Sek.', time:true}
+    ]},
+    // Alte Einheiten: nur noch für bestehende Trainings im Verlauf
     A: { name:'Einheit A', ex:[
       {k:'beinpresse',  n:'Beinpresse',   warm:2, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
       {k:'brustpresse', n:'Brustpresse',  warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
@@ -20,6 +39,11 @@
       {k:'pendelsquats',   n:'Pendulum Squats',warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'}
     ]}
   };
+
+  var PLAN_ORDER = ['push','pull','leg'];
+  var PLATE = {push:'PS', pull:'PL', leg:'LG', A:'A', B:'B'};
+  function pname(p){ return PLANS[p] ? PLANS[p].name : String(p); }
+  function plate(p){ return PLATE[p] || String(p).slice(0,2).toUpperCase(); }
 
   var GROUPS = [
     {g:'Rumpf und Hals', cols:2, f:[{k:'chest',n:'Brust',a:'Brust'},{k:'waist',n:'Taille',a:'Taille'},{k:'hip',n:'Hüfte',a:'Hüfte'},{k:'neck',n:'Hals',a:'Hals'}]},
@@ -60,7 +84,7 @@
 
   // ---------- state ----------
   var db = null, loaded = false, userPicked = false;
-  var view = 'A', histId = null, histMode = null, histPick = null;
+  var view = 'T', selPlan = null, histId = null, histMode = null, histPick = null;
   var confirmDel = false, confirmEnd = false, notice = '';
   var sessions = {}, pend = {}, timers = {}, inflight = {};
   var renderedKey = '', loadTimer = null;
@@ -187,8 +211,9 @@
       if (histId && sessions[histId] && histMode) return {mode:histMode, id:histId, plan:sessions[histId].plan, run:run};
       return {mode:'list', id:null, plan:null, run:run};
     }
-    if (run && run.plan === view) return {mode:'run', id:run.id, plan:view, run:run};
-    return {mode:'preview', id:null, plan:view, run:run};
+    if (run && PLANS[run.plan]) return {mode:'run', id:run.id, plan:run.plan, run:run};
+    if (selPlan) return {mode:'preview', id:null, plan:selPlan, run:run};
+    return {mode:'pick', id:null, plan:null, run:run};
   }
 
   // ---------- pending writes (Training) ----------
@@ -485,11 +510,11 @@
     var ul = h('ul', {class:'hlist'});
     list.forEach(function(s){
       var open = histPick === s.id;
-      var sub = 'Einheit ' + s.plan + ' · Nr. ' + (s.n || '?') + (s.durationSec != null ? ' · ' + fmtMin(s.durationSec) : '');
+      var sub = pname(s.plan) + ' · Nr. ' + (s.n || '?') + (s.durationSec != null ? ' · ' + fmtMin(s.durationSec) : '');
       var li = h('li', {class:'hitem p' + s.plan},
         h('button', {class:'hrow', type:'button', 'aria-expanded':String(open),
             onclick:function(){ histPick = open ? null : s.id; renderAll(); }},
-          h('span', {class:'plate', text:s.plan, 'aria-hidden':'true'}),
+          h('span', {class:'plate', text:plate(s.plan), 'aria-hidden':'true'}),
           h('span', {class:'ht'}, h('b', {text:fmtDateFull(s.date)}), h('small', {text:sub}))));
       if (open) {
         li.append(h('div', {class:'hact'},
@@ -558,7 +583,7 @@
   }
   function renderReminders(c){
     var box = $('#remind');
-    var show = c.mode === 'preview' || c.mode === 'list' || c.mode === 'body';
+    var show = c.mode === 'preview' || c.mode === 'pick' || c.mode === 'list' || c.mode === 'body';
     var items = show ? reminders() : [];
     box.hidden = !items.length;
     box.replaceChildren();
@@ -1061,7 +1086,7 @@
   }
   function applyVisibility(){
     $('#tab-E').hidden = !SHOW_NUTRI;
-    $('#tab-K').style.gridColumn = SHOW_NUTRI ? 'span 3' : 'span 6';
+    $('#tab-K').style.gridColumn = SHOW_NUTRI ? 'span 3' : 'span 2';
     var kz = document.querySelector('[aria-labelledby="h-kz"]'), um = document.querySelector('[aria-labelledby="h-um"]');
     if (kz) kz.hidden = !SHOW_GIRTH;
     if (um) um.hidden = !SHOW_GIRTH;
@@ -1406,6 +1431,24 @@
     (planDoc.notes || []).forEach(function(n){ box.append(h('p', {class:'hint', style:'margin:0;font-size:13px', text:n})); });
   }
 
+  // ---------- Trainingsart wählen ----------
+  function renderPicker(c){
+    var box = $('#picker');
+    var show = view === 'T' && (c.mode === 'pick' || c.mode === 'preview');
+    box.hidden = !show;
+    if (!show) { box.replaceChildren(); return; }
+    var done = doneSessions();
+    box.replaceChildren();
+    PLAN_ORDER.forEach(function(p){
+      var mine = done.filter(function(x){ return x.plan === p; });
+      var last = mine.length ? mine[mine.length - 1] : null;
+      box.append(h('button', {class:'plan p' + p, type:'button', 'aria-pressed':String(selPlan === p),
+          onclick:function(){ selPlan = p; notice = ''; renderAll(); }},
+        h('span', {class:'plate', text:plate(p), 'aria-hidden':'true'}),
+        h('span', {class:'ptxt'}, h('b', {text:pname(p)}), h('small', {text:last ? 'zuletzt ' + fmtDate(last.date) : 'noch nie'}))));
+    });
+  }
+
   // ---------- Rendern ----------
   function renderAll(){
     var c = ctx();
@@ -1413,23 +1456,20 @@
 
     var next = $('#next');
     if (!loaded) next.textContent = '';
-    else if (c.run) next.textContent = 'Training ' + c.run.plan + ' läuft seit ' + hhmm(c.run.startedAt) + ' Uhr.';
-    else if (!done.length) next.textContent = 'Starte mit Einheit A und trage Gewicht und Wiederholungen je Satz ein.';
+    else if (c.run) next.textContent = 'Training ' + pname(c.run.plan) + ' läuft seit ' + hhmm(c.run.startedAt) + ' Uhr.';
+    else if (!done.length) next.textContent = 'Wähle deine Trainingsart und trage Gewicht und Wiederholungen je Satz ein.';
     else {
-      var last = done[done.length - 1];
-      next.textContent = 'Zuletzt Einheit ' + last.plan + ' (' + fmtDate(last.date) + '). Als Nächstes: Einheit ' + (last.plan === 'A' ? 'B' : 'A') + '.';
+      var last = done[done.length - 1], li = PLAN_ORDER.indexOf(last.plan);
+      next.textContent = 'Zuletzt ' + pname(last.plan) + ' (' + fmtDate(last.date) + ').' + (li >= 0 ? ' Als Nächstes in der Reihe: ' + pname(PLAN_ORDER[(li + 1) % PLAN_ORDER.length]) + '.' : '');
     }
 
     applyVisibility();
-    $('#app').dataset.plan = view === 'H' ? (c.plan || 'H') : view;
-    ['A','B','H','K','E'].forEach(function(v){ $('#tab-' + v).setAttribute('aria-pressed', String(v === view)); });
+    $('#app').dataset.plan = view === 'H' ? (c.plan || 'H') : view === 'T' ? (c.plan || 'T') : view;
+    ['T','H','K','E'].forEach(function(v){ $('#tab-' + v).setAttribute('aria-pressed', String(v === view)); });
     var tdy = sumDay(todayStr());
     $('#cnt-E').textContent = tdy.kcal > 0 ? fmtI(tdy.kcal) + ' kcal heute' : 'Essen · Schritte · Ziel';
-    ['A','B'].forEach(function(p){
-      var n = done.filter(function(s){ return s.plan === p; }).length;
-      $('#cnt-' + p).textContent = loaded && n ? n + (n === 1 ? ' Einheit im Log' : ' Einheiten im Log')
-        : (p === 'A' ? 'Beine · Brust · Rücken' : 'Beine · Schultern · Waden');
-    });
+    $('#cnt-T').textContent = c.run ? 'läuft: ' + pname(c.run.plan) : (selPlan ? pname(selPlan) + ' gewählt' : 'Push · Pull · Leg');
+    renderPicker(c);
     $('#cnt-H').textContent = loaded && done.length ? done.length + (done.length === 1 ? ' Einheit' : ' Einheiten') : 'Alle Trainings';
     var wl = weightList();
     $('#cnt-K').textContent = wl.length ? fmt1(wl[wl.length - 1].kg) + ' kg' : 'Gewicht · Schritte';
@@ -1437,32 +1477,30 @@
     renderReminders(c);
 
     var nt = $('#notice');
-    nt.hidden = !(notice && c.mode === 'preview');
+    nt.hidden = !(notice && (c.mode === 'preview' || c.mode === 'pick'));
     nt.textContent = notice;
 
     // laufendes Training
     var isRun = c.mode === 'run';
     $('#runbar').hidden = !isRun;
     if (isRun) {
-      $('#rb-label').textContent = 'Einheit ' + c.plan + ' läuft';
+      $('#rb-label').textContent = pname(c.plan) + ' läuft';
       $('#since').textContent = c.run && c.run.startedAt ? 'Start ' + hhmm(c.run.startedAt) + ' Uhr' : '';
       updateTimer();
     }
 
     // Startbox
     var sbx = $('#startbox');
-    sbx.hidden = c.mode !== 'preview';
-    if (c.mode === 'preview') {
+    sbx.hidden = !(c.mode === 'preview' || c.mode === 'pick');
+    if (c.mode === 'preview' || c.mode === 'pick') {
       var st = $('#start-text'), nb = $('#new'), gb = $('#goto');
       nb.hidden = true; gb.hidden = true;
-      if (!db) st.textContent = 'Der Speicher ist hier nicht verfügbar. Öffne die Seite in Claude, dann kannst du ein Training starten.';
+      if (!db) st.textContent = 'Der Speicher ist hier nicht verfügbar.';
       else if (!loaded) st.textContent = 'Lade Einheiten …';
-      else if (c.run) {
-        st.textContent = 'Training ' + c.run.plan + ' läuft noch. Beende es, bevor du Einheit ' + view + ' startest.';
-        gb.hidden = false; gb.textContent = 'Zu Training ' + c.run.plan;
-      } else {
-        st.textContent = 'Bereit für Einheit ' + view + '? Mit dem Start beginnt die Zeit zu laufen.';
-        nb.hidden = false; nb.textContent = '+ Neue Einheit ' + view;
+      else if (c.mode === 'pick') st.textContent = 'Wähle oben eine Trainingsart. Danach siehst du die Übungen und kannst das Training starten.';
+      else {
+        st.textContent = 'Bereit für ' + pname(c.plan) + '? Mit dem Start beginnt die Zeit zu laufen.';
+        nb.hidden = false; nb.textContent = '+ Neues Training ' + pname(c.plan);
       }
     }
 
@@ -1494,8 +1532,8 @@
     if (showDh) {
       var s = sessions[c.id];
       $('#dhead').className = 'dhead p' + s.plan;
-      $('#dh-plate').textContent = s.plan;
-      $('#dh-title').textContent = 'Einheit ' + s.plan + ' vom ' + fmtDateFull(s.date);
+      $('#dh-plate').textContent = plate(s.plan);
+      $('#dh-title').textContent = pname(s.plan) + ' vom ' + fmtDateFull(s.date);
       $('#dh-badge').textContent = c.mode === 'view' ? 'Anschauen' : 'Bearbeiten';
       $('#dh-sub').textContent = 'Nr. ' + (s.n || '?') + (s.durationSec != null ? ' · Dauer ' + fmtMin(s.durationSec) : '');
     }
@@ -1524,19 +1562,15 @@
     loaded = true;
     if (first && !userPicked) {
       var run = runningSession();
-      if (run && PLANS[run.plan]) view = run.plan;
-      else {
-        var d = doneSessions();
-        if (d.length) view = d[d.length - 1].plan === 'A' ? 'B' : 'A';
-      }
+      if (run && PLANS[run.plan]) { view = 'T'; selPlan = run.plan; }
     }
     if (histId && !sessions[histId]) { histId = null; histMode = null; confirmDel = false; }
     if (histPick && !sessions[histPick]) histPick = null;
     renderAll();
   }
   async function newSession(){
-    if (!db || view === 'H' || view === 'K' || view === 'E' || runningSession()) return;
-    var plan = view;
+    if (!db || view !== 'T' || !selPlan || runningSession()) return;
+    var plan = selPlan;
     var same = sortedAll().filter(function(s){ return s.plan === plan; });
     var n = (same.length ? Math.max.apply(null, same.map(function(s){ return s.n || 0; })) : 0) + 1;
     var id = plan.toLowerCase() + '-' + pad(n);
@@ -1565,7 +1599,7 @@
       await db.doc('sessions/' + id).update(patch);
       sessions[id] = Object.assign({}, s, patch);
       confirmEnd = false; confirmDel = false;
-      notice = 'Training ' + s.plan + ' gespeichert. Dauer: ' + fmtMin(sec) + '.';
+      notice = 'Training ' + pname(s.plan) + ' gespeichert. Dauer: ' + fmtMin(sec) + '.';
       renderAll(); setStatus('saved');
     } catch (e) { setStatus('error'); }
   }
@@ -1584,10 +1618,11 @@
   }
 
   // ---------- Verdrahtung ----------
-  ['A','B','H','K','E'].forEach(function(v){
+  ['T','H','K','E'].forEach(function(v){
     $('#tab-' + v).addEventListener('click', function(){
       flushAll();
       view = v; userPicked = true; histId = null; histMode = null; histPick = null;
+      var rn = runningSession(); if (v === 'T' && rn && PLANS[rn.plan]) selPlan = rn.plan;
       confirmDel = false; confirmEnd = false; notice = '';
       renderAll();
     });
@@ -1595,7 +1630,7 @@
   $('#new').addEventListener('click', newSession);
   $('#goto').addEventListener('click', function(){
     var run = runningSession();
-    if (run && PLANS[run.plan]) { view = run.plan; userPicked = true; renderAll(); }
+    if (run && PLANS[run.plan]) { view = 'T'; selPlan = run.plan; userPicked = true; renderAll(); }
   });
   $('#end').addEventListener('click', function(){ confirmEnd = true; renderAll(); });
   $('#end-no').addEventListener('click', function(){ confirmEnd = false; renderAll(); });
