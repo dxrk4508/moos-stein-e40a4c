@@ -123,7 +123,10 @@
   // Schalter: auf true setzen, um die ausgeblendeten Bereiche wieder anzuzeigen
   var SHOW_NUTRI = false, SHOW_GIRTH = false;
   var food = {}, meals = {}, planDoc = null, planChecks = {}, nDate = null, mDelArm = null;
-  var exSel = {};   // gespeicherte Auswahl je Kategorie: {push:{brustpresse:'y'|'n'|'u'}}
+  // Programm (aus der eingelesenen Excel), Auswahl und Zustand
+  var program = {meta:null, weeks:{}}, progLoaded = false, progMsg = '', pgDelArm = false, progBusy = false, wpCand = null;
+  var selDay = null, planState = {}, skips = {}, wpPick = {};
+  var GROUPN = {push:'Push', pull:'Pull', leg:'Legs', weak:'Arms & Weak Points'};
 
   // Alle Übungen aus allen Kategorien, nach Schlüssel.
   var ALLEX = {};
@@ -131,36 +134,87 @@
   var EXORDER = [];
   PICK_ORDER.forEach(function(p){ PLANS[p].ex.forEach(function(e){ if (EXORDER.indexOf(e.k) < 0) EXORDER.push(e.k); }); });
   Object.keys(ALLEX).forEach(function(k){ if (EXORDER.indexOf(k) < 0) EXORDER.push(k); });
-  // Reihenfolge: zuerst wie in der Kategorie, danach der Rest
+  // Nur für alte Einheiten: Reihenfolge wie in der alten Kategorie
   function sortKeys(keys, plan){
     var base = plan && PLANS[plan] ? PLANS[plan].ex.map(function(e){ return e.k; }) : [];
     var order = base.concat(EXORDER.filter(function(k){ return base.indexOf(k) < 0; }));
     return order.filter(function(k){ return keys.indexOf(k) >= 0; });
   }
   function defaultKeys(plan){ return PLANS[plan].def ? PLANS[plan].def.slice() : PLANS[plan].ex.map(function(e){ return e.k; }); }
-  // y = mit in den Plan (grünes Häkchen), n = auslassen (rotes Kreuz), u = nicht gewählt (wird ebenfalls ausgelassen)
-  function selState(plan, k){
-    var m = exSel[plan], v = m && m[k];
-    if (v === 'y' || v === 'n' || v === 'u') return v;
-    return defaultKeys(plan).indexOf(k) >= 0 ? 'y' : 'u';
+
+  // ---------- Programm ----------
+  function slug(s){
+    return String(s).toLowerCase().replace(/^[a-z]\d:\s*/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'uebung';
   }
-  function selKeys(plan){
-    return PLANS[plan].ex.filter(function(e){ return selState(plan, e.k) === 'y'; }).map(function(e){ return e.k; });
+  function progReady(){ return !!(program.meta && program.meta.days && program.meta.days.length); }
+  function curWeek(){
+    var ws = progReady() ? program.meta.weeks : [], w = planState && +planState.week;
+    return ws.indexOf(w) >= 0 ? w : (ws[0] || 1);
   }
-  // Welche Übungen gelten gerade? Gespeicherte Auswahl der Einheit, Auswahl der Kategorie vor dem Start oder der alte Standard.
+  function dayMeta(id){
+    var d = progReady() ? program.meta.days : [];
+    for (var i = 0; i < d.length; i++) if (d[i].id === id) return d[i];
+    return null;
+  }
+  function dayRaw(w, d){ var wk = program.weeks[w]; return wk && wk.days && wk.days[d] && Array.isArray(wk.days[d].ex) ? wk.days[d].ex : []; }
+  function blockOf(w){
+    var bl = progReady() ? program.meta.blocks || [] : [];
+    for (var i = 0; i < bl.length; i++) if ((bl[i].weeks || []).indexOf(w) >= 0) return i + 1;
+    return 0;
+  }
+  function isSkipped(d, k){ return !!(skips[d] && skips[d][k]); }
+  function uniqKey(k, used){ var b = k, n = 2; while (used[k]) k = b + '-' + (n++); used[k] = 1; return k; }
+  // Übung für die Anzeige aus den Programmdaten bauen
+  function mkEx(raw, key, name, extra){
+    raw = raw || {};
+    return Object.assign({
+      k:key, n:name, warm: raw.warm != null ? raw.warm : 1, opt:false, rep: raw.reps || '', hi: raw.hi || null, pause: raw.rest || '',
+      time: !!raw.time, tech: raw.tech || '', erpe: raw.erpe || '', lrpe: raw.lrpe || '', note: raw.note || '',
+      subs: raw.subs || [], ps: raw.sets || '', wp: raw.wp || 0, orig: raw.n || name
+    }, extra || {});
+  }
+  // Vorschau: alle Übungen des Tages, ohne die ausgelassenen und mit gewählten Weakpoint-Übungen
+  function previewList(){
+    var d = selDay, raws = dayRaw(curWeek(), d), used = {}, out = [];
+    raws.forEach(function(raw, i){
+      if (raw.wp) {
+        var nm = wpPick[raw.wp];
+        if (nm) out.push(mkEx(raw, uniqKey(slug(nm), used), nm, {i:i, orig:nm}));
+        return;
+      }
+      var k0 = slug(raw.n);
+      if (isSkipped(d, k0)) return;
+      out.push(mkEx(raw, uniqKey(k0, used), raw.n, {i:i}));
+    });
+    return out;
+  }
+  function slotEx(s, sl, si){
+    var raw = s.prog ? (dayRaw(s.prog.w, s.prog.d)[sl.i] || null) : null;
+    var ex = mkEx(raw, sl.k, sl.n, {i:sl.i, s:sl.s || 0, si:si});
+    if (!raw) { ex.warm = sl.w != null ? sl.w : 1; ex.orig = sl.n; }
+    else if (raw.wp) ex.orig = sl.n;
+    return ex;
+  }
+  function sname(s){
+    if (!s) return '';
+    if (s.dname) return s.dname + (s.prog && s.prog.w ? ' · Woche ' + s.prog.w : '');
+    return pname(s.plan);
+  }
+  // Welche Übungen gelten gerade? Einheit mit Programm-Slots, Vorschau eines Programm-Tages oder alte Einheit.
   function exList(c){
-    var keys = null;
-    if (c.id && sessions[c.id] && Array.isArray(sessions[c.id].exs)) keys = sortKeys(sessions[c.id].exs, c.plan);
-    else if (c.mode === 'preview') keys = selKeys(c.plan);
-    else keys = defaultKeys(c.plan);
+    var s = c.id ? sessions[c.id] : null;
+    if (s && Array.isArray(s.slots)) return s.slots.map(function(sl, i){ return slotEx(s, sl, i); });
+    if (c.mode === 'preview') return previewList();
+    var keys = s && Array.isArray(s.exs) ? sortKeys(s.exs, c.plan) : defaultKeys(c.plan);
     return keys.map(function(k){ return ALLEX[k]; }).filter(Boolean);
   }
 
   // ---------- helpers ----------
   function setsFor(ex){
     var out = [];
-    if (ex.warm === 2) out.push({k:'w1',label:'Aufwärmen 1',warm:true},{k:'w2',label:'Aufwärmen 2',warm:true});
-    else if (ex.warm === 1) out.push({k:'w1',label:ex.opt ? 'Aufwärmen (optional)' : 'Aufwärmen',warm:true});
+    var w = Math.min(3, ex.warm | 0);
+    if (w >= 2) { for (var wi = 1; wi <= w; wi++) out.push({k:'w' + wi, label:'Aufwärmen ' + wi, warm:true}); }
+    else if (w === 1) out.push({k:'w1',label:ex.opt ? 'Aufwärmen (optional)' : 'Aufwärmen',warm:true});
     out.push({k:'s1',label:'Satz 1'},{k:'s2',label:'Satz 2'},{k:'s3',label:'Satz 3'});
     return out;
   }
@@ -255,7 +309,7 @@
       return {mode:'list', id:null, plan:null, run:run};
     }
     if (run && PLANS[run.plan]) return {mode:'run', id:run.id, plan:run.plan, run:run};
-    if (selPlan) return {mode:'preview', id:null, plan:selPlan, run:run};
+    if (selPlan && selDay && progReady()) return {mode:'preview', id:null, plan:selPlan, run:run};
     return {mode:'pick', id:null, plan:null, run:run};
   }
 
@@ -358,16 +412,61 @@
       readonly: ro, oninput:onInput, onchange:onChange
     });
   }
-  function head(ex, idx){
+  function infoBox(ex, withSubs){
+    var lines = [];
+    if (ex.tech) lines.push(['Technik im letzten Satz', ex.tech]);
+    if (ex.note) lines.push(['Hinweis', ex.note]);
+    if (withSubs && ex.subs && ex.subs.length) ex.subs.forEach(function(n, i){ lines.push(['Substitution ' + (i + 1), n]); });
+    if (ex.ps && ex.ps !== '3') lines.push(['Im Programm', ex.ps + ' Arbeitssätze, hier immer 3']);
+    if (!lines.length) return null;
+    return h('details', {class:'xinfo'}, h('summary', {text:'Infos'}),
+      lines.map(function(l){ return h('p', {}, h('b', {text:l[0] + ': '}), l[1]); }));
+  }
+  function toggleSwap(e, ex){
+    var btn = e.currentTarget, panel = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!panel) return;
+    var open = panel.hidden;
+    if (open) fillSwap(panel, ex);   // beim Öffnen frisch aufbauen, damit gesperrte Übungen (mit Werten) stimmen
+    panel.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  }
+  function head(ex, idx, swap, withSubs){
+    var tags = [];
+    if (ex.rep) tags.push(h('span', {class:'tag', text:'3 × ' + ex.rep}));
+    if (ex.pause) tags.push(h('span', {class:'tag', text:'Pause ' + ex.pause}));
+    if (ex.erpe || ex.lrpe) tags.push(h('span', {class:'tag', text:'RPE ' + (ex.erpe || '–') + ' → ' + (ex.lrpe || '–')}));
     return [
-      h('div', {class:'ch'},
+      h('div', {class:'ch' + (swap ? ' hs' : '')},
         h('span', {class:'ix', text:String(idx+1)}),
         h('h2', {id:'h-'+ex.k, text:ex.n}),
-        h('div', {class:'tags'},
-          h('span', {class:'tag', text:'3 × ' + ex.rep}),
-          h('span', {class:'tag', text:'Pause ' + ex.pause}))),
+        swap ? h('button', {class:'swapbtn', type:'button', 'aria-expanded':'false', 'aria-controls':'sw-'+ex.k, onclick:function(e){ toggleSwap(e, ex); }, text:'Übung ändern'}) : null,
+        h('div', {class:'tags'}, tags)),
+      swap ? swapPanel(ex) : null,
+      infoBox(ex, withSubs),
       h('p', {class:'up', id:'up-'+ex.k, hidden:true})
     ];
+  }
+  // Ersatzübungen (Substitution 1 und 2) oder Suche bei Weakpoint-Übungen
+  function swapPanel(ex){ return h('div', {class:'swap', id:'sw-'+ex.k, hidden:true}); }
+  function fillSwap(box, ex){
+    var c = ctx(), s = c.id ? sessions[c.id] : null;
+    var locked = !!(s && hasData(s, ex.k));
+    box.replaceChildren();
+    if (ex.wp) {
+      box.append(h('p', {class:'hint', text: locked ? 'Hier stehen schon Werte. Zum Wechseln erst die Werte löschen.' : 'Andere Weakpoint-Übung suchen:'}));
+      if (!locked) box.append(wpField(function(name){ setSlotName(c.id, ex.si, name, 0); }, 'sw-' + ex.si));
+      return;
+    }
+    var opts = [{s:0, label:'Original', n:ex.orig}].concat((ex.subs || []).map(function(n, i){ return {s:i + 1, label:'Substitution ' + (i + 1), n:n}; }));
+    var used = {};
+    if (s && s.slots) s.slots.forEach(function(x, i){ if (i !== ex.si) used[x.k] = 1; });
+    box.append(h('ul', {class:'subs'}, opts.map(function(o){
+      var cur = o.s === (ex.s || 0), clash = !cur && used[slug(o.n)];
+      return h('li', {}, h('button', {class:'sopt', type:'button', 'aria-pressed':String(cur),
+          disabled: (!cur && (locked || clash)) ? true : null, onclick:function(){ if (!cur) setSlotName(c.id, ex.si, o.n, o.s); }},
+        h('span', {class:'sl', text:o.label}), h('span', {class:'sn', text:o.n})));
+    })));
+    if (locked) box.append(h('p', {class:'hint', text:'Hier stehen schon Werte. Zum Wechseln erst die Werte löschen.'}));
   }
   function card(ex, idx, cmode){
     var ro = cmode === 'view';
@@ -380,8 +479,9 @@
         h('span', {class:'x', text: ex.time ? '' : '×', 'aria-hidden':'true'}),
         inp(ex, s, ex.time ? 'sec' : 'reps', 'numeric', ro));
     });
+    var swap = cmode === 'run' && !!(ex.wp || (ex.subs && ex.subs.length));
     return h('section', {class:'card', 'aria-labelledby':'h-'+ex.k},
-      head(ex, idx),
+      head(ex, idx, swap, false),
       h('div', {class:'row cols', 'aria-hidden':'true'},
         h('span'),
         h('span', {text: ex.time ? '' : 'kg'}),
@@ -422,7 +522,7 @@
         h('span', {class:'last', id:'last-'+ex.k+'-'+s.k, text:'–'}));
     });
     return h('section', {class:'card', 'aria-labelledby':'h-'+ex.k},
-      head(ex, idx),
+      head(ex, idx, false, true),
       h('div', {class:'prow cols', 'aria-hidden':'true'}, h('span'), h('span', {text:'Zuletzt'})),
       rows);
   }
@@ -439,7 +539,8 @@
   }
   function cardKey(c){
     var ex = c.plan && PLANS[c.plan] && c.mode !== 'list' && c.mode !== 'body' && c.mode !== 'nutri' ? exList(c).map(function(e){ return e.k; }).join(',') : '';
-    return view + '|' + c.mode + '|' + (c.id || '') + '|' + (c.plan || '') + '|' + ex;
+    var pk = c.mode === 'preview' ? curWeek() + selDay : '';
+    return view + '|' + c.mode + '|' + (c.id || '') + '|' + (c.plan || '') + '|' + ex + '|' + pk + '|' + Object.keys(program.weeks).length;
   }
 
   function syncValues(c){
@@ -478,7 +579,7 @@
       if (note) note.placeholder = c.mode === 'view' ? '' : ((prev && getVal(prev, ex.k, '', 'note')) || 'Notiz, z. B. Sitzeinstellung');
       var up = document.getElementById('up-'+ex.k);
       if (up) {
-        var done = (c.mode === 'run' || preview) && prev && ['s1','s2','s3'].every(function(k){
+        var done = (c.mode === 'run' || preview) && prev && ex.hi && ['s1','s2','s3'].every(function(k){
           var v = getVal(prev, ex.k, k, ex.time ? 'sec' : 'reps');
           return v != null && v >= ex.hi;
         });
@@ -493,77 +594,186 @@
     });
   }
 
-  // ---------- Übungen je Kategorie wählen ----------
+  // ---------- Übungen des Tages wählen ----------
   var ICON_Y = 'M5 12.5l4.5 4.5L19 7.5', ICON_N = 'M6 6l12 12M18 6L6 18';
   function xbtn(kind, on, label, disabled, onclick){
     var ic = svg('svg', {viewBox:'0 0 24 24', width:'22', height:'22', fill:'none', stroke:'currentColor', 'stroke-width':'3', 'stroke-linecap':'round', 'stroke-linejoin':'round', 'aria-hidden':'true'});
     ic.append(svg('path', {d:kind === 'y' ? ICON_Y : ICON_N}));
     return h('button', {class:'xb ' + kind, type:'button', 'aria-pressed':String(on), 'aria-label':label,
-      'data-fk':label, disabled:disabled ? true : null, onclick:onclick}, ic);
+      'data-fk':label + kind, disabled:disabled ? true : null, onclick:onclick}, ic);
   }
-  function exMeta(ex){ return (ex.time ? ex.rep : ex.rep + ' Wdh.') + ' · Pause ' + ex.pause; }
+  function rawMeta(raw){
+    var t = [];
+    if (raw.reps) t.push('3 × ' + raw.reps);
+    if (raw.rest) t.push('Pause ' + raw.rest);
+    return t.join(' · ');
+  }
 
-  // Vor dem Start: Auswahl der Kategorie speichern (bleibt für das nächste Mal erhalten)
-  async function setSel(plan, k, st){
-    var next = selState(plan, k) === st ? 'u' : st;
-    var map = {};
-    PLANS[plan].ex.forEach(function(e){ map[e.k] = selState(plan, e.k); });
-    map[k] = next;
-    var local = Object.assign({}, exSel); local[plan] = map; exSel = local;
+  // Suche für die Weakpoint-Übungen: Vorschläge aus der Weak-Point-Tabelle und allen Übungen des Programms
+  function wpCandidates(){
+    if (wpCand) return wpCand;
+    var out = [], seen = {};
+    function add(n, m){ var k = slug(n); if (!n || seen[k]) return; seen[k] = 1; out.push({n:n, m:m || ''}); }
+    if (progReady()) {
+      (program.meta.wp || []).forEach(function(r){ (r.o1 || []).concat(r.o2 || []).forEach(function(n){ add(n, r.m); }); });
+      Object.keys(program.weeks).forEach(function(w){
+        var days = program.weeks[w].days || {};
+        Object.keys(days).forEach(function(d){
+          (days[d].ex || []).forEach(function(e){
+            if (e.wp) return;
+            add(String(e.n).replace(/^[A-Za-z]\d:\s*/, ''), '');
+            (e.subs || []).forEach(function(n){ add(n, ''); });
+          });
+        });
+      });
+    }
+    wpCand = out;
+    return out;
+  }
+  function wpField(onPick, fk){
+    var wrap = h('div', {class:'wpf'});
+    var inp = h('input', {type:'text', class:'fin', placeholder:'Übung suchen, z. B. Lateral Raise', autocomplete:'off', autocapitalize:'off', spellcheck:'false',
+      maxlength:'120', 'aria-label':'Weakpoint-Übung suchen', 'data-fk':fk || 'wp'});
+    var list = h('ul', {class:'wpl', hidden:true});
+    var own = h('button', {class:'link-btn', type:'button', hidden:true});
+    function pick(name){
+      name = String(name).replace(/\s+/g, ' ').trim().slice(0, 120);
+      if (!name) return;
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      onPick(name);
+    }
+    function refresh(){
+      var raw = inp.value.trim(), terms = raw.toLowerCase().split(/\s+/).filter(Boolean);
+      list.replaceChildren(); own.hidden = true;
+      if (!terms.length) { list.hidden = true; return; }
+      var hits = wpCandidates().filter(function(c){
+        var hay = (c.n + ' ' + c.m).toLowerCase();
+        return terms.every(function(t){ return hay.indexOf(t) >= 0; });
+      }).slice(0, 8);
+      hits.forEach(function(c){
+        list.append(h('li', {}, h('button', {type:'button', class:'wpo', onclick:function(){ pick(c.n); }},
+          h('span', {text:c.n}), c.m ? h('small', {text:c.m}) : null)));
+      });
+      list.hidden = !hits.length;
+      if (!hits.some(function(c){ return c.n.toLowerCase() === raw.toLowerCase(); })) { own.hidden = false; own.textContent = 'Eigene Übung „' + raw + '“ verwenden'; }
+    }
+    inp.addEventListener('input', refresh);
+    inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); pick(inp.value); } });
+    own.addEventListener('click', function(){ pick(inp.value); });
+    wrap.append(inp, list, own);
+    return wrap;
+  }
+
+  // Vor dem Start: Übung für diesen Tag auslassen oder wieder aufnehmen (bleibt gespeichert)
+  async function setSkip(day, key, skip){
+    var local = Object.assign({}, skips);
+    local[day] = Object.assign({}, local[day] || {});
+    if (skip) local[day][key] = 1; else delete local[day][key];
+    skips = local;
     renderAll();
     if (!db) return;
     setStatus('saving');
     try {
-      var patch = {}; patch[plan] = map;
-      await db.doc('plan/exsel').update(patch);
+      var patch = {}; patch[day] = {}; patch[day][key] = skip ? 1 : {__delete__:true};
+      await db.doc('plan/skip').update(patch);
       setStatus('saved');
     } catch (e) { setStatus('error'); }
   }
-  // Während oder nach dem Training: Übungen dieser Einheit anpassen
-  async function setSessionEx(c, key, on){
-    if (!db || !c.id) return;
-    var cur = exList(c).map(function(e){ return e.k; });
-    var next = sortKeys(on ? cur.concat([key]) : cur.filter(function(k){ return k !== key; }), c.plan);
-    if (!next.length || sameSet(next, cur)) { renderAll(); return; }
+  async function saveSlots(cid, slots){
+    var s = sessions[cid], exs = slots.map(function(x){ return x.k; });
     setStatus('saving');
     try {
-      await db.doc('sessions/' + c.id).update({exs:next, edited:Date.now()});
-      sessions[c.id] = Object.assign({}, sessions[c.id], {exs:next});
+      await db.doc('sessions/' + cid).update({slots:slots, exs:exs, edited:Date.now()});
+      sessions[cid] = Object.assign({}, s, {slots:slots, exs:exs});
       renderAll(); setStatus('saved');
     } catch (e) { setStatus('error'); renderAll(); }
   }
-  function sameSet(a, b){ return a.length === b.length && a.every(function(k){ return b.indexOf(k) >= 0; }); }
+  // Übung wechseln (Substitution oder andere Weakpoint-Übung), solange noch keine Werte stehen
+  async function setSlotName(cid, si, name, sNum){
+    if (!db || !cid) return;
+    await flush(cid);
+    var s = sessions[cid];
+    if (!s || !Array.isArray(s.slots) || !s.slots[si]) return;
+    var sl = s.slots[si], k = slug(name);
+    if (k === sl.k && (sl.s || 0) === sNum) { renderAll(); return; }
+    if (hasData(s, sl.k)) { renderAll(); return; }
+    if (s.slots.some(function(x, i){ return i !== si && x.k === k; })) { renderAll(); return; }
+    var slots = s.slots.map(function(x, i){ return i === si ? Object.assign({}, x, {k:k, n:name, s:sNum}) : x; });
+    await saveSlots(cid, slots);
+  }
+  // Übung zur laufenden Einheit dazunehmen oder auslassen
+  async function setSlotInclude(cid, i, raw, name, on){
+    if (!db || !cid) return;
+    await flush(cid);
+    var s = sessions[cid];
+    if (!s || !Array.isArray(s.slots)) return;
+    var slots = s.slots.slice();
+    if (on) {
+      var k = slug(name);
+      if (slots.some(function(x){ return x.i === i || x.k === k; })) { renderAll(); return; }
+      slots.push({k:k, n:name, i:i, s:0, w:raw.warm != null ? raw.warm : 1});
+      slots.sort(function(a, b){ return a.i - b.i; });
+    } else {
+      var idx = slots.findIndex(function(x){ return x.i === i; });
+      if (idx < 0 || hasData(s, slots[idx].k) || slots.length === 1) { renderAll(); return; }
+      slots.splice(idx, 1);
+    }
+    await saveSlots(cid, slots);
+  }
 
   function renderCustom(c){
     var box = $('#custom');
-    var show = c.plan && PLANS[c.plan] && ((c.mode === 'preview' && db && loaded && !c.run) || c.mode === 'run' || c.mode === 'edit');
+    var s = c.id ? sessions[c.id] : null;
+    var show = progReady() && ((c.mode === 'preview' && db && loaded && !c.run) || ((c.mode === 'run' || c.mode === 'edit') && s && Array.isArray(s.slots) && s.prog));
     box.hidden = !show;
     if (!show) { box.replaceChildren(); return; }
-    var foc = document.activeElement && box.contains(document.activeElement) ? document.activeElement.getAttribute('data-fk') : null;
+    var active = document.activeElement;
+    if (active && box.contains(active) && active.tagName === 'INPUT') return;
+    var foc = active && box.contains(active) ? active.getAttribute('data-fk') : null;
     box.replaceChildren();
     var pv = c.mode === 'preview';
-    var s = c.id ? sessions[c.id] : null;
-    var cur = exList(c).map(function(e){ return e.k; });
-    // Nur Übungen dieser Kategorie. Übungen, die schon in der Einheit stehen, bleiben sichtbar.
-    var list = PLANS[c.plan].ex.slice();
-    cur.forEach(function(k){ if (!list.some(function(e){ return e.k === k; }) && ALLEX[k]) list.push(ALLEX[k]); });
-    var rows = h('ul', {class:'xsel'}, list.map(function(ex){
-      var st = pv ? selState(c.plan, ex.k) : (cur.indexOf(ex.k) >= 0 ? 'y' : 'n');
-      var locked = !pv && st === 'y' && s && hasData(s, ex.k);
-      return h('li', {class:'xrow', 'data-s':st},
-        h('span', {class:'xn'}, h('b', {text:ex.n}), h('small', {text: locked ? 'hat schon Werte' : exMeta(ex)})),
-        xbtn('y', st === 'y', ex.n + ': mit in den Plan', false, function(){ pv ? setSel(c.plan, ex.k, 'y') : setSessionEx(c, ex.k, true); }),
-        xbtn('n', st === 'n', ex.n + ': auslassen', locked, function(){ pv ? setSel(c.plan, ex.k, 'n') : setSessionEx(c, ex.k, false); }));
+    var wk = pv ? curWeek() : s.prog.w, dayId = pv ? selDay : s.prog.d, dm = dayMeta(dayId);
+    var raws = dayRaw(wk, dayId), cur = exList(c), chosen = {};
+    cur.forEach(function(e){ chosen[e.i] = e; });
+    var rows = h('ul', {class:'xsel'}, raws.map(function(raw, i){
+      if (raw.wp) {
+        var label = 'Weakpoint-Übung ' + raw.wp + (raw.wp > 1 ? ' (optional)' : '');
+        var nm = pv ? wpPick[raw.wp] : (chosen[i] ? chosen[i].n : '');
+        if (!nm) {
+          return h('li', {class:'xrow wprow'},
+            h('span', {class:'xn'}, h('b', {text:label}), h('small', {text:rawMeta(raw) + ' · beliebige Übung für deine Schwachstelle'})),
+            wpField(function(name){
+              if (pv) { wpPick[raw.wp] = name; renderAll(); }
+              else setSlotInclude(c.id, i, raw, name, true);
+            }, 'wp-' + i));
+        }
+        var lockedW = !pv && s && hasData(s, chosen[i].k);
+        return h('li', {class:'xrow', 'data-s':'y'},
+          h('span', {class:'xn'}, h('b', {text:nm}), h('small', {text: lockedW ? 'hat schon Werte' : label + ' · ' + rawMeta(raw)})),
+          xbtn('y', true, nm + ': dabei', true, function(){}),
+          xbtn('n', false, nm + ': auslassen', !!lockedW, function(){
+            if (pv) { delete wpPick[raw.wp]; renderAll(); }
+            else setSlotInclude(c.id, i, raw, nm, false);
+          }));
+      }
+      var inc = pv ? !isSkipped(dayId, slug(raw.n)) : !!chosen[i];
+      var locked = !pv && inc && s && hasData(s, chosen[i].k);
+      var shown = !pv && chosen[i] ? chosen[i].n : raw.n;
+      return h('li', {class:'xrow', 'data-s':inc ? 'y' : 'n'},
+        h('span', {class:'xn'}, h('b', {text:shown}), h('small', {text: locked ? 'hat schon Werte' : rawMeta(raw)})),
+        xbtn('y', inc, raw.n + ': mit in den Plan', false, function(){ pv ? setSkip(dayId, slug(raw.n), false) : setSlotInclude(c.id, i, raw, raw.n, true); }),
+        xbtn('n', !inc, raw.n + ': auslassen', !!locked, function(){ pv ? setSkip(dayId, slug(raw.n), true) : setSlotInclude(c.id, i, raw, raw.n, false); }));
     }));
-    var n = cur.length;
-    var head = pv ? [
-      h('h2', {class:'sec', text:'Übungen · ' + pname(c.plan)}),
-      h('p', {class:'hint', text:'Grünes Häkchen: kommt mit in den Plan. Rotes Kreuz oder nichts angetippt: wird ausgelassen. Deine Auswahl bleibt gespeichert.'}),
+    var n = cur.length, title = (dm ? dm.name : '') + ' · Woche ' + wk;
+    var kids = pv ? [
+      h('h2', {class:'sec', text:'Übungen · ' + title}),
+      dm && dm.focus ? h('p', {class:'hint', text:dm.focus}) : null,
+      h('p', {class:'hint', text:'Grünes Häkchen: kommt mit in den Plan. Rotes Kreuz: wird ausgelassen. Deine Auswahl bleibt gespeichert.'}),
       rows,
-      h('p', {class:'xcount', text: n ? n + ' von ' + list.length + ' Übungen im Plan' : 'Noch keine Übung im Plan'})
+      h('p', {class:'xcount', text: n ? n + ' von ' + raws.length + ' Übungen im Plan' : 'Noch keine Übung im Plan'})
     ] : [det('custom-' + c.mode, false, 'Übungen dieser Einheit ändern (' + n + ')',
-        h('p', {class:'hint', text:'Häkchen: dabei. Kreuz: auslassen. Übungen mit eingetragenen Werten lassen sich nicht auslassen.'}), rows)];
-    box.append.apply(box, head);
+        h('p', {class:'hint', text:'Häkchen: dabei. Kreuz: auslassen. Übungen mit eingetragenen Werten lassen sich nicht auslassen. Ersatzübungen wählst du über „Übung ändern“ bei der Übung.'}), rows)];
+    box.append.apply(box, kids.filter(Boolean));
     if (foc) { var again = box.querySelector('[data-fk="' + foc.replace(/"/g, '\\"') + '"]'); if (again) again.focus(); }
   }
 
@@ -585,7 +795,7 @@
     var ul = h('ul', {class:'hlist'});
     list.forEach(function(s){
       var open = histPick === s.id;
-      var sub = pname(s.plan) + ' · Nr. ' + (s.n || '?') + (s.durationSec != null ? ' · ' + fmtMin(s.durationSec) : '');
+      var sub = sname(s) + ' · Nr. ' + (s.n || '?') + (s.durationSec != null ? ' · ' + fmtMin(s.durationSec) : '');
       var li = h('li', {class:'hitem p' + s.plan},
         h('button', {class:'hrow', type:'button', 'aria-expanded':String(open),
             onclick:function(){ histPick = open ? null : s.id; renderAll(); }},
@@ -1506,47 +1716,158 @@
     (planDoc.notes || []).forEach(function(n){ box.append(h('p', {class:'hint', style:'margin:0;font-size:13px', text:n})); });
   }
 
-  // ---------- Trainingsart wählen ----------
-  function renderPicker(c){
-    var box = $('#picker');
-    var show = view === 'T' && (c.mode === 'pick' || c.mode === 'preview');
-    box.hidden = !show;
-    if (!show) { box.replaceChildren(); return; }
+  // ---------- Gruppe, Tag und Woche wählen ----------
+  function lastOf(pred){
     var done = doneSessions();
+    for (var i = done.length - 1; i >= 0; i--) if (pred(done[i])) return done[i];
+    return null;
+  }
+  function nextDayForGroup(p){
+    var days = progReady() ? program.meta.days.filter(function(d){ return d.group === p; }) : [];
+    if (!days.length) return null;
+    var last = lastOf(function(x){ return x.prog && days.some(function(d){ return d.id === x.prog.d; }); });
+    if (!last) return days[0].id;
+    var li = days.findIndex(function(d){ return d.id === last.prog.d; });
+    return days[(li + 1) % days.length].id;
+  }
+  function renderPicker(c){
+    var box = $('#picker'), dbx = $('#daypick');
+    var show = view === 'T' && progReady() && (c.mode === 'pick' || c.mode === 'preview');
+    box.hidden = !show; dbx.hidden = !(show && selPlan);
+    if (!show) { box.replaceChildren(); dbx.replaceChildren(); return; }
     box.replaceChildren();
     PICK_ORDER.forEach(function(p){
-      var mine = done.filter(function(x){ return x.plan === p; });
-      var last = mine.length ? mine[mine.length - 1] : null;
+      var last = lastOf(function(x){ return x.prog && x.plan === p; });
       box.append(h('button', {class:'plan p' + p, type:'button', 'aria-pressed':String(selPlan === p),
-          onclick:function(){ selPlan = p; notice = ''; renderAll(); }},
+          onclick:function(){ selPlan = p; selDay = nextDayForGroup(p); notice = ''; renderAll(); }},
         h('span', {class:'plate', text:plate(p), 'aria-hidden':'true'}),
-        h('span', {class:'ptxt'}, h('b', {text:pname(p)}), h('small', {text:last ? 'zuletzt ' + fmtDate(last.date) : 'noch nie'}))));
+        h('span', {class:'ptxt'}, h('b', {text:GROUPN[p]}), h('small', {text:last ? 'zuletzt ' + fmtDate(last.date) : 'noch nie'}))));
     });
+    dbx.replaceChildren();
+    if (selPlan) {
+      program.meta.days.filter(function(d){ return d.group === selPlan; }).forEach(function(d){
+        var last = lastOf(function(x){ return x.prog && x.prog.d === d.id; });
+        dbx.append(h('button', {class:'plan dayb p' + selPlan, type:'button', 'aria-pressed':String(selDay === d.id),
+            onclick:function(){ selDay = d.id; notice = ''; renderAll(); }},
+          h('span', {class:'ptxt'}, h('b', {text:d.name}),
+            h('small', {text: d.focus || (last ? 'zuletzt ' + fmtDate(last.date) : 'noch nie')}),
+            d.focus && last ? h('small', {text:'zuletzt ' + fmtDate(last.date)}) : null)));
+      });
+    }
+  }
+  var weekSig = '';
+  function renderWeekbar(c){
+    var box = $('#weekbar');
+    var show = view === 'T' && progReady() && (c.mode === 'pick' || c.mode === 'preview');
+    box.hidden = !show;
+    if (!show) { weekSig = ''; box.replaceChildren(); return; }
+    var w = curWeek(), sig = program.meta.importedAt + '|' + w;
+    if (sig === weekSig) return;
+    weekSig = sig;
+    box.replaceChildren();
+    var sel = h('select', {id:'weeksel', class:'fin', 'aria-label':'Woche wählen', onchange:function(e){ setWeek(+e.target.value); }},
+      program.meta.weeks.map(function(x){
+        var bl = blockOf(x);
+        return h('option', {value:String(x), selected: x === w ? true : null, text:'Woche ' + x + (bl ? ' · Block ' + bl : '')});
+      }));
+    box.append(h('label', {for:'weeksel', text:'Woche'}), sel);
+    var note = program.meta.wnotes && program.meta.wnotes[w];
+    if (note) box.append(h('p', {class:'wnote', text:note}));
+  }
+  async function setWeek(w){
+    planState = Object.assign({}, planState, {week:w});
+    renderAll();
+    if (!db) return;
+    setStatus('saving');
+    try { await db.doc('plan/state').update({week:w}); setStatus('saved'); } catch (e) { setStatus('error'); }
   }
 
+  // ---------- Programm einlesen ----------
+  async function importProgram(file){
+    if (!file || progBusy) return;
+    progBusy = true; progMsg = 'Lese Datei …'; renderAll();
+    try {
+      if (!window.__xlsx || !window.__localdb) throw Object.assign(new Error('Einlesen ist hier nicht verfügbar.'), {user:true});
+      var res = await window.__xlsx.parseProgram(await file.arrayBuffer());
+      await window.__localdb.replaceCollection('program', res.docs);
+      pgDelArm = false;
+      progMsg = 'Programm eingelesen: ' + res.weeks + ' Wochen, ' + res.days + ' Tage, ' + res.exercises + ' Übungen.';
+    } catch (e) {
+      progMsg = e && e.user ? e.message : 'Das Einlesen hat nicht geklappt. Es wurde nichts geändert.';
+    } finally {
+      progBusy = false; var fi = $('#prog-file'); if (fi) fi.value = '';
+      renderAll();
+    }
+  }
+  async function removeProgram(){
+    try { await window.__localdb.replaceCollection('program', {}); progMsg = 'Programm entfernt. Deine bisherigen Einheiten bleiben erhalten.'; }
+    catch (e) { progMsg = 'Entfernen hat nicht geklappt.'; }
+    pgDelArm = false; renderAll();
+  }
+  function pickFile(){ var fi = $('#prog-file'); if (fi && !progBusy) fi.click(); }
+  function renderProgBox(c){
+    var box = $('#progbox');
+    var show = view === 'T' && progLoaded && !progReady() && c.mode !== 'run';
+    box.hidden = !show;
+    if (!show) { box.replaceChildren(); return; }
+    box.replaceChildren(
+      h('div', {class:'bh'}, h('h3', {text:'Programm einlesen'})),
+      h('div', {class:'bb'},
+        h('p', {class:'hint', style:'margin-top:0', text:'Wähle deine Excel-Datei „Pure Bodybuilding – PPL“. Sie wird nur auf diesem Gerät gelesen und nirgends hochgeladen. Danach findest du Wochen, Tage, Übungen und Ersatzübungen hier in der App.'}),
+        h('div', {class:'bactions'}, h('button', {class:'btn-new', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text:'Excel-Datei wählen'})),
+        h('p', {class:'hint', role:'status', style:'margin-bottom:0', text:progMsg})));
+  }
+  function renderProgCard(){
+    var box = $('#progcard');
+    if (!box) return;
+    var m = progReady() ? program.meta : null, kids = [];
+    kids.push(h('p', {class:'hint', style:'margin-top:0', text: m
+      ? 'Eingelesen am ' + fmtDateFull(todayOf(m.importedAt)) + ': ' + m.weeks.length + ' Wochen, ' + m.days.length + ' Tage. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'
+      : 'Noch kein Programm eingelesen. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'}));
+    var acts = [h('button', {class: m ? 'btn-sec' : 'btn-new', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text: m ? 'Neu einlesen' : 'Excel-Datei wählen'})];
+    if (m && !pgDelArm) acts.push(h('button', {class:'link-btn', type:'button', text:'Programm entfernen', onclick:function(){ pgDelArm = true; renderAll(); }}));
+    if (m && pgDelArm) acts.push(h('span', {class:'confirm'}, h('span', {text:'Programm wirklich entfernen?'}),
+      h('button', {class:'danger', type:'button', text:'Entfernen', onclick:removeProgram}),
+      h('button', {class:'link-btn', type:'button', text:'Abbrechen', onclick:function(){ pgDelArm = false; renderAll(); }})));
+    kids.push(h('div', {class:'bactions'}, acts));
+    kids.push(h('p', {class:'hint', role:'status', style:'margin-bottom:0', text:progMsg}));
+    box.replaceChildren(h('div', {class:'bh'}, h('h3', {text:'Programm'})), h('div', {class:'bb'}, kids));
+  }
+  function todayOf(ts){ var d = new Date(ts || Date.now()); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+
   // ---------- Rendern ----------
+  function nextText(done, c){
+    if (!loaded) return '';
+    if (c.run) return 'Training ' + sname(c.run) + ' läuft seit ' + hhmm(c.run.startedAt) + ' Uhr.';
+    if (!progReady()) return progLoaded ? 'Lies zuerst dein Programm ein, dann kannst du loslegen.' : '';
+    var last = lastOf(function(x){ return !!x.prog; });
+    if (!last) return 'Stelle die Woche ein, wähle Gruppe und Tag und starte dein Training.';
+    var order = program.meta.days.map(function(d){ return d.id; }), li = order.indexOf(last.prog.d);
+    var t = 'Zuletzt ' + sname(last) + ' (' + fmtDate(last.date) + ').';
+    if (li >= 0) {
+      var nw = last.prog.w + (li + 1 >= order.length ? 1 : 0);
+      if (program.meta.weeks.indexOf(nw) >= 0) t += ' Als Nächstes laut Programm: ' + dayMeta(order[(li + 1) % order.length]).name + ' in Woche ' + nw + '.';
+      else t += ' Das war der letzte Tag des Programms.';
+    }
+    return t;
+  }
+
   function renderAll(){
     var c = ctx();
     var done = doneSessions();
 
     var next = $('#next');
-    if (!loaded) next.textContent = '';
-    else if (c.run) next.textContent = 'Training ' + pname(c.run.plan) + ' läuft seit ' + hhmm(c.run.startedAt) + ' Uhr.';
-    else if (!done.length) next.textContent = 'Wähle deine Trainingsart und trage Gewicht und Wiederholungen je Satz ein.';
-    else {
-      var last = done[done.length - 1], lastRot = null;
-      for (var di = done.length - 1; di >= 0; di--) { if (PLAN_ORDER.indexOf(done[di].plan) >= 0) { lastRot = done[di]; break; } }
-      var li = lastRot ? PLAN_ORDER.indexOf(lastRot.plan) : -1;
-      next.textContent = 'Zuletzt ' + pname(last.plan) + ' (' + fmtDate(last.date) + ').' + (li >= 0 ? ' Als Nächstes in der Reihe: ' + pname(PLAN_ORDER[(li + 1) % PLAN_ORDER.length]) + '.' : '');
-    }
+    next.textContent = nextText(done, c);
 
     applyVisibility();
-    $('#app').dataset.plan = view === 'H' ? (c.plan || 'H') : view === 'T' ? (c.plan || 'T') : view;
+    $('#app').dataset.plan = view === 'H' ? (c.plan || 'H') : view === 'T' ? (c.plan || selPlan || 'T') : view;
     ['T','H','K','E'].forEach(function(v){ $('#tab-' + v).setAttribute('aria-pressed', String(v === view)); });
     var tdy = sumDay(todayStr());
     $('#cnt-E').textContent = tdy.kcal > 0 ? fmtI(tdy.kcal) + ' kcal heute' : 'Essen · Schritte · Ziel';
-    $('#cnt-T').textContent = c.run ? 'läuft: ' + pname(c.run.plan) : (selPlan ? pname(selPlan) + ' gewählt' : '4 Kategorien');
+    $('#cnt-T').textContent = c.run ? 'läuft: ' + (c.run.dname || pname(c.run.plan)) : (progReady() ? (selDay && dayMeta(selDay) ? dayMeta(selDay).name : 'Woche ' + curWeek()) : 'Programm einlesen');
     renderPicker(c);
+    renderWeekbar(c);
+    renderProgBox(c);
     $('#cnt-H').textContent = loaded && done.length ? done.length + (done.length === 1 ? ' Einheit' : ' Einheiten') : 'Alle Trainings';
     var wl = weightList();
     $('#cnt-K').textContent = wl.length ? fmt1(wl[wl.length - 1].kg) + ' kg' : 'Gewicht · Schritte';
@@ -1561,26 +1882,26 @@
     var isRun = c.mode === 'run';
     $('#runbar').hidden = !isRun;
     if (isRun) {
-      $('#rb-label').textContent = pname(c.plan) + ' läuft';
+      $('#rb-label').textContent = sname(c.run) + ' läuft';
       $('#since').textContent = c.run && c.run.startedAt ? 'Start ' + hhmm(c.run.startedAt) + ' Uhr' : '';
       updateTimer();
     }
 
     // Startbox
-    var sbx = $('#startbox');
-    sbx.hidden = !(c.mode === 'preview' || c.mode === 'pick');
-    if (c.mode === 'preview' || c.mode === 'pick') {
+    var sbx = $('#startbox'), ready = progReady();
+    sbx.hidden = !(ready && (c.mode === 'preview' || c.mode === 'pick'));
+    if (ready && (c.mode === 'preview' || c.mode === 'pick')) {
       var st = $('#start-text'), nb = $('#new'), gb = $('#goto');
       nb.hidden = true; gb.hidden = true;
       if (!db) st.textContent = 'Der Speicher ist hier nicht verfügbar.';
       else if (!loaded) st.textContent = 'Lade Einheiten …';
-      else if (c.mode === 'pick') st.textContent = 'Wähle oben eine Kategorie. Danach siehst du die Übungen, wählst deine aus und startest das Training.';
+      else if (c.mode === 'pick') st.textContent = 'Wähle oben die Woche, eine Gruppe und den Tag. Danach siehst du die Übungen und kannst das Training starten.';
       else {
-        var chosen = selKeys(c.plan).length;
+        var chosen = previewList().length, dmn = dayMeta(selDay);
         st.textContent = chosen
-          ? 'Bereit für ' + pname(c.plan) + ' mit ' + chosen + (chosen === 1 ? ' Übung' : ' Übungen') + '? Mit dem Start beginnt die Zeit zu laufen.'
-          : 'Setze oben bei mindestens einer Übung das grüne Häkchen. Danach kannst du starten.';
-        nb.hidden = false; nb.textContent = '+ Neues Training ' + pname(c.plan); nb.disabled = !chosen;
+          ? 'Bereit für ' + dmn.name + ' (Woche ' + curWeek() + ') mit ' + chosen + (chosen === 1 ? ' Übung' : ' Übungen') + '? Mit dem Start beginnt die Zeit zu laufen.'
+          : 'Es ist keine Übung im Plan. Setze oben bei mindestens einer Übung das grüne Häkchen.';
+        nb.hidden = false; nb.textContent = '+ Neues Training ' + dmn.name; nb.disabled = !chosen;
       }
     }
 
@@ -1613,7 +1934,7 @@
       var s = sessions[c.id];
       $('#dhead').className = 'dhead p' + s.plan;
       $('#dh-plate').textContent = plate(s.plan);
-      $('#dh-title').textContent = pname(s.plan) + ' vom ' + fmtDateFull(s.date);
+      $('#dh-title').textContent = sname(s) + ' vom ' + fmtDateFull(s.date);
       $('#dh-badge').textContent = c.mode === 'view' ? 'Anschauen' : 'Bearbeiten';
       $('#dh-sub').textContent = 'Nr. ' + (s.n || '?') + (s.durationSec != null ? ' · Dauer ' + fmtMin(s.durationSec) : '');
     }
@@ -1626,7 +1947,7 @@
 
     // Körper
     $('#body').hidden = c.mode !== 'body';
-    if (c.mode === 'body') renderBody();
+    if (c.mode === 'body') { renderBody(); renderProgCard(); }
     $('#nutri').hidden = c.mode !== 'nutri';
     if (c.mode === 'nutri') renderNutri();
     renderCustom(c);
@@ -1642,26 +1963,29 @@
     loaded = true;
     if (first && !userPicked) {
       var run = runningSession();
-      if (run && PLANS[run.plan]) { view = 'T'; selPlan = run.plan; }
+      if (run && PLANS[run.plan]) { view = 'T'; selPlan = run.plan; if (run.prog) selDay = run.prog.d; }
     }
     if (histId && !sessions[histId]) { histId = null; histMode = null; confirmDel = false; }
     if (histPick && !sessions[histPick]) histPick = null;
     renderAll();
   }
   async function newSession(){
-    if (!db || view !== 'T' || !selPlan || runningSession()) return;
-    var plan = selPlan;
-    var chosen = selKeys(plan);
-    if (!chosen.length) return;
+    if (!db || view !== 'T' || !selPlan || !selDay || !progReady() || runningSession()) return;
+    var plan = selPlan, dm = dayMeta(selDay), w = curWeek();
+    var list = previewList();
+    if (!dm || !list.length) return;
     var same = sortedAll().filter(function(s){ return s.plan === plan; });
     var n = (same.length ? Math.max.apply(null, same.map(function(s){ return s.n || 0; })) : 0) + 1;
     var id = plan.toLowerCase() + '-' + pad(n);
     var now = Date.now();
-    var data = {plan:plan, n:n, date:todayStr(), ts:now, startedAt:now, status:'running', entries:{}, edited:now};
-    data.exs = sortKeys(chosen, plan);
+    var slots = list.map(function(ex){ return {k:ex.k, n:ex.n, i:ex.i, s:0, w:ex.warm}; });
+    var data = {plan:plan, n:n, date:todayStr(), ts:now, startedAt:now, status:'running', entries:{}, edited:now,
+      prog:{w:w, d:selDay}, dname:dm.name, slots:slots, exs:slots.map(function(x){ return x.k; })};
+    if (dm.focus) data.dfocus = dm.focus;
     setStatus('saving');
     try {
       await db.doc('sessions/' + id).set(data);
+      wpPick = {};
       sessions[id] = data; notice = ''; confirmDel = false; confirmEnd = false;
       renderAll(); setStatus('saved');
     } catch (e) { setStatus('error'); }
@@ -1680,7 +2004,7 @@
       await db.doc('sessions/' + id).update(patch);
       sessions[id] = Object.assign({}, s, patch);
       confirmEnd = false; confirmDel = false;
-      notice = 'Training ' + pname(s.plan) + ' gespeichert. Dauer: ' + fmtMin(sec) + '.';
+      notice = 'Training ' + sname(s) + ' gespeichert. Dauer: ' + fmtMin(sec) + '.';
       renderAll(); setStatus('saved');
     } catch (e) { setStatus('error'); }
   }
@@ -1709,6 +2033,7 @@
     });
   });
   $('#new').addEventListener('click', newSession);
+  $('#prog-file').addEventListener('change', function(e){ importProgram(e.target.files && e.target.files[0]); });
   $('#goto').addEventListener('click', function(){
     var run = runningSession();
     if (run && PLANS[run.plan]) { view = 'T'; selPlan = run.plan; userPicked = true; renderAll(); }
@@ -1835,8 +2160,21 @@
     db.doc('plan/current').onSnapshot(function(snap){
       planDoc = snap.exists ? (snap.data() || null) : null; renderAll();
     }, function(){});
-    db.doc('plan/exsel').onSnapshot(function(snap){
-      exSel = snap.exists ? (snap.data() || {}) : {}; renderAll();
+    db.collection('program').onSnapshot(function(snap){
+      var m = null, w = {};
+      snap.docs.forEach(function(d){
+        var x = d.data();
+        if (d.id === 'meta') m = x; else if (x && x.week) w[x.week] = x;
+      });
+      program = {meta:m, weeks:w}; progLoaded = true; wpCand = null;
+      if (selDay && !dayMeta(selDay)) selDay = null;
+      renderAll();
+    }, function(){ progLoaded = true; renderAll(); });
+    db.doc('plan/state').onSnapshot(function(snap){
+      planState = snap.exists ? (snap.data() || {}) : {}; renderAll();
+    }, function(){});
+    db.doc('plan/skip').onSnapshot(function(snap){
+      skips = snap.exists ? (snap.data() || {}) : {}; renderAll();
     }, function(){});
     db.doc('plan/checks').onSnapshot(function(snap){
       planChecks = snap.exists ? (snap.data() || {}) : {}; renderAll();

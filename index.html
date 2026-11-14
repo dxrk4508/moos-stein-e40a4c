@@ -24,7 +24,7 @@
   <nav class="plans" aria-label="Bereich wählen">
     <button class="plan" id="tab-T" type="button" aria-pressed="false">
       <span class="plate" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg></span>
-      <span class="ptxt"><b>Training</b><small id="cnt-T">4 Kategorien</small></span>
+      <span class="ptxt"><b>Training</b><small id="cnt-T">Programm</small></span>
     </button>
     <button class="plan" id="tab-H" type="button" aria-pressed="false">
       <span class="plate" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
@@ -49,7 +49,12 @@
     <span class="timer" id="timer" role="timer">00:00:00</span>
   </section>
 
-  <div class="picker plans" id="picker" role="group" aria-label="Trainingsart" hidden></div>
+  <section class="weekbar" id="weekbar" hidden></section>
+
+  <section class="card bcard" id="progbox" aria-label="Programm einlesen" hidden></section>
+
+  <div class="picker plans" id="picker" role="group" aria-label="Gruppe" hidden></div>
+  <div class="days" id="daypick" role="group" aria-label="Tag" hidden></div>
 
   <section class="custom" id="custom" hidden></section>
 
@@ -281,6 +286,8 @@
       </div>
     </section>
 
+    <section class="card bcard" id="progcard" aria-label="Programm"></section>
+
     <section class="card bcard" aria-labelledby="h-bk">
       <div class="bh"><h3 id="h-bk">Sichern &amp; Wiederherstellen</h3></div>
       <div class="bb">
@@ -296,11 +303,14 @@
     </section>
   </section>
 
+  <input id="prog-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+
   <p class="foot">Alles, was du einträgst, wird automatisch gespeichert. Die graue Zeile unter dem Satznamen zeigt, was du beim letzten Mal geschafft hast. Alle Daten bleiben nur auf diesem Gerät. <span id="appver"></span></p>
 </div>
 
 <script src="version.js"></script>
 <script src="localdb.js"></script>
+<script src="xlsx.js"></script>
 <script src="app.js"></script>
 <script src="backup.js"></script>
 <script src="boot.js"></script>

@@ -3,7 +3,7 @@
 importScripts('version.js');
 var CACHE = 'trainingslog-' + self.APP_VERSION;
 var FILES = [
-  './', 'index.html', 'app.css', 'app.js', 'localdb.js', 'backup.js', 'boot.js', 'version.js',
+  './', 'index.html', 'app.css', 'app.js', 'localdb.js', 'xlsx.js', 'backup.js', 'boot.js', 'version.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
   'fonts/barlow-latin-400-normal.woff2', 'fonts/barlow-latin-500-normal.woff2', 'fonts/barlow-latin-600-normal.woff2',
   'fonts/barlow-condensed-latin-600-normal.woff2', 'fonts/barlow-condensed-latin-700-normal.woff2'

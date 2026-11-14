@@ -6,6 +6,7 @@
   var DB_NAME = 'trainingslog', STORE = 'docs';
   var SEG = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
   var BAD = { '__proto__': 1, 'constructor': 1, 'prototype': 1 };
+  var NOBACKUP = /^program\//;   // das eingelesene Programm gehört nicht ins Backup
   var cache = Object.create(null);   // "sammlung/id" -> Daten
   var listeners = [];
   var idb = null, opening = null;
@@ -141,7 +142,7 @@
     exportAll: async function () {
       await open();
       var docs = {};
-      Object.keys(cache).sort().forEach(function (k) { docs[k] = clone(cache[k]); });
+      Object.keys(cache).sort().forEach(function (k) { if (!NOBACKUP.test(k)) docs[k] = clone(cache[k]); });
       return docs;
     },
     importDocs: async function (docs) {   // überschreibt Dokumente mit gleicher ID, lässt andere unberührt
@@ -153,7 +154,22 @@
       if (ops.length) await write(ops);
       return ops.length;
     },
-    count: async function () { await open(); return Object.keys(cache).length; },
+    count: async function () { await open(); return Object.keys(cache).filter(function (k) { return !NOBACKUP.test(k); }).length; },
+    // Ersetzt alle Dokumente einer Sammlung auf einmal (alles oder nichts)
+    replaceCollection: async function (col, docs) {
+      if (!SEG.test(String(col))) throw new Error('Ungültiger Sammlungsname');
+      await open();
+      var ops = [], keep = {};
+      Object.keys(docs).forEach(function (k) {
+        var p = splitPath(k);
+        if (p[0] !== col) throw new Error('Ungültiger Pfad');
+        check(docs[k]); keep[k] = 1;
+        ops.push({ path: k, value: clone(docs[k]) });
+      });
+      Object.keys(cache).forEach(function (k) { if (k.indexOf(col + '/') === 0 && !keep[k]) ops.push({ path: k, value: undefined }); });
+      if (ops.length) await write(ops);
+      return ops.length;
+    },
     requestPersistence: async function () {
       try { return navigator.storage && navigator.storage.persist ? await navigator.storage.persist() : false; } catch (e) { return false; }
     }
