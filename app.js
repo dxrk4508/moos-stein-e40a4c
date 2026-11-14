@@ -1,24 +1,51 @@
 (function(){
   'use strict';
 
+  // ex = alle Übungen der Kategorie (Bibliothek), def = bisherige Standardauswahl
   var PLANS = {
-    push: { name:'Push', ex:[
-      {k:'brustpresse',    n:'Brustpresse',    warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
-      {k:'schulterpresse', n:'Schulterpresse', warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
-      {k:'butterfly',      n:'Butterfly',      warm:1, opt:false, rep:'12–15', hi:15, pause:'1,5 Min'},
-      {k:'trizepsdruecken',n:'Trizepsdrücken', warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'}
+    push: { name:'Push', def:['brustpresse','schulterpresse','butterfly','trizepsdruecken'], ex:[
+      {k:'brustpresse',    n:'Brustpresse',        warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'schraegpresse',  n:'Schrägbank Presse',  warm:1, opt:true,  rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'schulterpresse', n:'Schulterpresse',     warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'seitheben',      n:'Seitheben',          warm:1, opt:true,  rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'butterfly',      n:'Butterfly',          warm:1, opt:false, rep:'12–15', hi:15, pause:'1,5 Min'},
+      {k:'kabelfly',       n:'Kabelzug Fly',       warm:1, opt:true,  rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'trizepsdruecken',n:'Trizepsdrücken',     warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'},
+      {k:'trizeps-overhead',n:'Trizeps über Kopf', warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'},
+      {k:'dips',           n:'Dip Maschine',       warm:1, opt:true,  rep:'8–12',  hi:12, pause:'1,5 Min'}
     ]},
-    pull: { name:'Pull', ex:[
-      {k:'latzug',      n:'Latzug',       warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
-      {k:'rudern',      n:'Rudern',       warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
-      {k:'bizeps-curls',n:'Bizeps Curls', warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'}
+    pull: { name:'Pull', def:['latzug','rudern','bizeps-curls'], ex:[
+      {k:'latzug',           n:'Latzug',                 warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'latzug-untergriff',n:'Latzug Untergriff',      warm:1, opt:true,  rep:'8–12',  hi:12, pause:'1,5 Min'},
+      {k:'rudern',           n:'Rudern',                 warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'rudern-brust',     n:'Brustgestütztes Rudern', warm:1, opt:true,  rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'pullover',         n:'Pullover am Kabel',      warm:1, opt:true,  rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'face-pulls',       n:'Face Pulls',             warm:1, opt:true,  rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'reverse-butterfly',n:'Reverse Butterfly',      warm:1, opt:true,  rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'bizeps-curls',     n:'Bizeps Curls',           warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'},
+      {k:'hammer-curls',     n:'Hammer Curls',           warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'},
+      {k:'scott-curls',      n:'Scott Curls',            warm:1, opt:true,  rep:'10–12', hi:12, pause:'1 Min'}
     ]},
-    leg: { name:'Leg', ex:[
+    leg: { name:'Leg', def:['beinpresse','bein-beuger','pendelsquats','wadenheben','plank'], ex:[
       {k:'beinpresse',  n:'Beinpresse',      warm:2, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
       {k:'bein-beuger', n:'Bein Beuger',     warm:1, opt:false, rep:'10–12', hi:12, pause:'1,5 Min'},
       {k:'pendelsquats',n:'Pendulum Squats', warm:1, opt:false, rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'bein-strecker',n:'Bein Strecker',  warm:1, opt:true,  rep:'10–15', hi:15, pause:'1,5 Min'},
+      {k:'hip-thrust',  n:'Hip Thrust',      warm:1, opt:true,  rep:'8–12',  hi:12, pause:'2 Min'},
+      {k:'ausfallschritte',n:'Ausfallschritte',warm:1,opt:true,  rep:'10–12', hi:12, pause:'1,5 Min'},
+      {k:'abduktoren',  n:'Abduktoren',      warm:1, opt:true,  rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'adduktoren',  n:'Adduktoren',      warm:1, opt:true,  rep:'12–15', hi:15, pause:'1 Min'},
       {k:'wadenheben',  n:'Wadenheben',      warm:1, opt:false, rep:'12–15', hi:15, pause:'1 Min'},
       {k:'plank',       n:'Plank',           warm:0, opt:false, rep:'20–40 Sek.', hi:40, pause:'45–60 Sek.', time:true}
+    ]},
+    weak: { name:'Weakpoints', def:[], ex:[
+      {k:'crunch',            n:'Bauch Crunch Maschine',     warm:0, opt:false, rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'beinheben',         n:'Beinheben (Captain\'s Chair)',warm:0, opt:false, rep:'10–15', hi:15, pause:'1 Min'},
+      {k:'holzhacker',        n:'Kabel Holzhacker',          warm:0, opt:false, rep:'12–15', hi:15, pause:'1 Min'},
+      {k:'rueckenstrecker',   n:'Rückenstrecker',            warm:1, opt:true,  rep:'10–15', hi:15, pause:'1,5 Min'},
+      {k:'schulterzucken',    n:'Schulterzucken (Trapez)',   warm:1, opt:true,  rep:'10–15', hi:15, pause:'1 Min'},
+      {k:'handgelenk-curls',  n:'Handgelenk Curls (Unterarme)',warm:0,opt:false,rep:'12–20', hi:20, pause:'1 Min'},
+      {k:'wadenheben-sitzend',n:'Wadenheben sitzend',        warm:0, opt:false, rep:'12–20', hi:20, pause:'1 Min'}
     ]},
     // Alte Einheiten: nur noch für bestehende Trainings im Verlauf
     A: { name:'Einheit A', ex:[
@@ -40,8 +67,9 @@
     ]}
   };
 
-  var PLAN_ORDER = ['push','pull','leg'];
-  var PLATE = {push:'PS', pull:'PL', leg:'LG', A:'A', B:'B'};
+  var PLAN_ORDER = ['push','pull','leg'];              // Reihenfolge für den Vorschlag "Als Nächstes"
+  var PICK_ORDER = ['push','pull','leg','weak'];       // Kategorien zur Auswahl
+  var PLATE = {push:'PS', pull:'PL', leg:'LG', weak:'WP', A:'A', B:'B'};
   function pname(p){ return PLANS[p] ? PLANS[p].name : String(p); }
   function plate(p){ return PLATE[p] || String(p).slice(0,2).toUpperCase(); }
 
@@ -95,22 +123,37 @@
   // Schalter: auf true setzen, um die ausgeblendeten Bereiche wieder anzuzeigen
   var SHOW_NUTRI = false, SHOW_GIRTH = false;
   var food = {}, meals = {}, planDoc = null, planChecks = {}, nDate = null, mDelArm = null;
-  var custSel = {};
+  var exSel = {};   // gespeicherte Auswahl je Kategorie: {push:{brustpresse:'y'|'n'|'u'}}
 
-  // Alle Übungen aus allen Plänen. So lässt sich eine Einheit pro Tag anpassen.
+  // Alle Übungen aus allen Kategorien, nach Schlüssel.
   var ALLEX = {};
   Object.keys(PLANS).forEach(function(p){ PLANS[p].ex.forEach(function(ex){ if (!ALLEX[ex.k]) ALLEX[ex.k] = ex; }); });
-  var EXORDER = ['beinpresse','brustpresse','schulterpresse','latzug','rudern','butterfly','bein-beuger','wadenheben','pendelsquats','trizepsdruecken','bizeps-curls','plank'];
-  function sortKeys(keys){ return EXORDER.filter(function(k){ return keys.indexOf(k) >= 0; }); }
-  function defaultKeys(plan){ return PLANS[plan].ex.map(function(e){ return e.k; }); }
-  function sameSet(a, b){ return a.length === b.length && a.every(function(k){ return b.indexOf(k) >= 0; }); }
-  // Welche Übungen gelten gerade? Eigene Auswahl der Einheit, Auswahl vor dem Start oder der Standardplan.
+  var EXORDER = [];
+  PICK_ORDER.forEach(function(p){ PLANS[p].ex.forEach(function(e){ if (EXORDER.indexOf(e.k) < 0) EXORDER.push(e.k); }); });
+  Object.keys(ALLEX).forEach(function(k){ if (EXORDER.indexOf(k) < 0) EXORDER.push(k); });
+  // Reihenfolge: zuerst wie in der Kategorie, danach der Rest
+  function sortKeys(keys, plan){
+    var base = plan && PLANS[plan] ? PLANS[plan].ex.map(function(e){ return e.k; }) : [];
+    var order = base.concat(EXORDER.filter(function(k){ return base.indexOf(k) < 0; }));
+    return order.filter(function(k){ return keys.indexOf(k) >= 0; });
+  }
+  function defaultKeys(plan){ return PLANS[plan].def ? PLANS[plan].def.slice() : PLANS[plan].ex.map(function(e){ return e.k; }); }
+  // y = mit in den Plan (grünes Häkchen), n = auslassen (rotes Kreuz), u = nicht gewählt (wird ebenfalls ausgelassen)
+  function selState(plan, k){
+    var m = exSel[plan], v = m && m[k];
+    if (v === 'y' || v === 'n' || v === 'u') return v;
+    return defaultKeys(plan).indexOf(k) >= 0 ? 'y' : 'u';
+  }
+  function selKeys(plan){
+    return PLANS[plan].ex.filter(function(e){ return selState(plan, e.k) === 'y'; }).map(function(e){ return e.k; });
+  }
+  // Welche Übungen gelten gerade? Gespeicherte Auswahl der Einheit, Auswahl der Kategorie vor dem Start oder der alte Standard.
   function exList(c){
     var keys = null;
-    if (c.id && sessions[c.id] && Array.isArray(sessions[c.id].exs)) keys = sessions[c.id].exs;
-    else if (c.mode === 'preview' && custSel[c.plan]) keys = custSel[c.plan];
-    if (!keys) return PLANS[c.plan].ex;
-    return sortKeys(keys).map(function(k){ return ALLEX[k]; }).filter(Boolean);
+    if (c.id && sessions[c.id] && Array.isArray(sessions[c.id].exs)) keys = sortKeys(sessions[c.id].exs, c.plan);
+    else if (c.mode === 'preview') keys = selKeys(c.plan);
+    else keys = defaultKeys(c.plan);
+    return keys.map(function(k){ return ALLEX[k]; }).filter(Boolean);
   }
 
   // ---------- helpers ----------
@@ -450,16 +493,38 @@
     });
   }
 
-  // ---------- Übungen pro Einheit anpassen ----------
-  async function toggleEx(c, key, on){
-    var cur = exList(c).map(function(e){ return e.k; });
-    var next = sortKeys(on ? cur.concat([key]) : cur.filter(function(k){ return k !== key; }));
-    if (!next.length) { renderAll(); return; }
-    if (c.mode === 'preview') {
-      custSel[c.plan] = sameSet(next, defaultKeys(c.plan)) ? null : next;
-      renderAll(); return;
-    }
+  // ---------- Übungen je Kategorie wählen ----------
+  var ICON_Y = 'M5 12.5l4.5 4.5L19 7.5', ICON_N = 'M6 6l12 12M18 6L6 18';
+  function xbtn(kind, on, label, disabled, onclick){
+    var ic = svg('svg', {viewBox:'0 0 24 24', width:'22', height:'22', fill:'none', stroke:'currentColor', 'stroke-width':'3', 'stroke-linecap':'round', 'stroke-linejoin':'round', 'aria-hidden':'true'});
+    ic.append(svg('path', {d:kind === 'y' ? ICON_Y : ICON_N}));
+    return h('button', {class:'xb ' + kind, type:'button', 'aria-pressed':String(on), 'aria-label':label,
+      'data-fk':label, disabled:disabled ? true : null, onclick:onclick}, ic);
+  }
+  function exMeta(ex){ return (ex.time ? ex.rep : ex.rep + ' Wdh.') + ' · Pause ' + ex.pause; }
+
+  // Vor dem Start: Auswahl der Kategorie speichern (bleibt für das nächste Mal erhalten)
+  async function setSel(plan, k, st){
+    var next = selState(plan, k) === st ? 'u' : st;
+    var map = {};
+    PLANS[plan].ex.forEach(function(e){ map[e.k] = selState(plan, e.k); });
+    map[k] = next;
+    var local = Object.assign({}, exSel); local[plan] = map; exSel = local;
+    renderAll();
+    if (!db) return;
+    setStatus('saving');
+    try {
+      var patch = {}; patch[plan] = map;
+      await db.doc('plan/exsel').update(patch);
+      setStatus('saved');
+    } catch (e) { setStatus('error'); }
+  }
+  // Während oder nach dem Training: Übungen dieser Einheit anpassen
+  async function setSessionEx(c, key, on){
     if (!db || !c.id) return;
+    var cur = exList(c).map(function(e){ return e.k; });
+    var next = sortKeys(on ? cur.concat([key]) : cur.filter(function(k){ return k !== key; }), c.plan);
+    if (!next.length || sameSet(next, cur)) { renderAll(); return; }
     setStatus('saving');
     try {
       await db.doc('sessions/' + c.id).update({exs:next, edited:Date.now()});
@@ -467,29 +532,39 @@
       renderAll(); setStatus('saved');
     } catch (e) { setStatus('error'); renderAll(); }
   }
+  function sameSet(a, b){ return a.length === b.length && a.every(function(k){ return b.indexOf(k) >= 0; }); }
+
   function renderCustom(c){
     var box = $('#custom');
     var show = c.plan && PLANS[c.plan] && ((c.mode === 'preview' && db && loaded && !c.run) || c.mode === 'run' || c.mode === 'edit');
     box.hidden = !show;
     if (!show) { box.replaceChildren(); return; }
-    var active = document.activeElement;
-    if (active && box.contains(active) && active.tagName === 'INPUT' && active.type !== 'checkbox') return;
+    var foc = document.activeElement && box.contains(document.activeElement) ? document.activeElement.getAttribute('data-fk') : null;
     box.replaceChildren();
+    var pv = c.mode === 'preview';
+    var s = c.id ? sessions[c.id] : null;
     var cur = exList(c).map(function(e){ return e.k; });
-    var def = defaultKeys(c.plan), s = c.id ? sessions[c.id] : null;
-    var changed = !sameSet(cur, def);
-    var list = EXORDER.map(function(k){ return ALLEX[k]; }).filter(Boolean);
-    var ul = h('ul', {class:'shop'}, list.map(function(ex){
-      var on = cur.indexOf(ex.k) >= 0, locked = on && s && hasData(s, ex.k);
-      return h('li', {}, h('label', {},
-        h('input', {type:'checkbox', checked:on ? true : null, disabled:locked ? true : null, 'aria-label':ex.n,
-          onchange:function(e){ toggleEx(c, ex.k, e.target.checked); }}),
-        h('span', {}, ex.n, locked ? h('small', {text:'hat schon Werte'}) : null),
-        h('span', {class:'pr', text:def.indexOf(ex.k) >= 0 ? 'Standard' : ''})));
+    // Nur Übungen dieser Kategorie. Übungen, die schon in der Einheit stehen, bleiben sichtbar.
+    var list = PLANS[c.plan].ex.slice();
+    cur.forEach(function(k){ if (!list.some(function(e){ return e.k === k; }) && ALLEX[k]) list.push(ALLEX[k]); });
+    var rows = h('ul', {class:'xsel'}, list.map(function(ex){
+      var st = pv ? selState(c.plan, ex.k) : (cur.indexOf(ex.k) >= 0 ? 'y' : 'n');
+      var locked = !pv && st === 'y' && s && hasData(s, ex.k);
+      return h('li', {class:'xrow', 'data-s':st},
+        h('span', {class:'xn'}, h('b', {text:ex.n}), h('small', {text: locked ? 'hat schon Werte' : exMeta(ex)})),
+        xbtn('y', st === 'y', ex.n + ': mit in den Plan', false, function(){ pv ? setSel(c.plan, ex.k, 'y') : setSessionEx(c, ex.k, true); }),
+        xbtn('n', st === 'n', ex.n + ': auslassen', locked, function(){ pv ? setSel(c.plan, ex.k, 'n') : setSessionEx(c, ex.k, false); }));
     }));
-    var kids = [h('p', {class:'hint', text:'Häkchen setzen oder entfernen. So tauschst du Übungen für diese Einheit, zum Beispiel bei Muskelkater.'}), ul];
-    if (c.mode === 'preview' && changed) kids.push(h('button', {class:'link-btn', type:'button', text:'Auf Standard zurücksetzen', onclick:function(){ custSel[c.plan] = null; renderAll(); }}));
-    box.append(det('custom-' + c.mode, changed, changed ? 'Übungen heute angepasst (' + cur.length + ')' : 'Übungen heute anpassen', kids));
+    var n = cur.length;
+    var head = pv ? [
+      h('h2', {class:'sec', text:'Übungen · ' + pname(c.plan)}),
+      h('p', {class:'hint', text:'Grünes Häkchen: kommt mit in den Plan. Rotes Kreuz oder nichts angetippt: wird ausgelassen. Deine Auswahl bleibt gespeichert.'}),
+      rows,
+      h('p', {class:'xcount', text: n ? n + ' von ' + list.length + ' Übungen im Plan' : 'Noch keine Übung im Plan'})
+    ] : [det('custom-' + c.mode, false, 'Übungen dieser Einheit ändern (' + n + ')',
+        h('p', {class:'hint', text:'Häkchen: dabei. Kreuz: auslassen. Übungen mit eingetragenen Werten lassen sich nicht auslassen.'}), rows)];
+    box.append.apply(box, head);
+    if (foc) { var again = box.querySelector('[data-fk="' + foc.replace(/"/g, '\\"') + '"]'); if (again) again.focus(); }
   }
 
   // ---------- Verlauf ----------
@@ -1439,7 +1514,7 @@
     if (!show) { box.replaceChildren(); return; }
     var done = doneSessions();
     box.replaceChildren();
-    PLAN_ORDER.forEach(function(p){
+    PICK_ORDER.forEach(function(p){
       var mine = done.filter(function(x){ return x.plan === p; });
       var last = mine.length ? mine[mine.length - 1] : null;
       box.append(h('button', {class:'plan p' + p, type:'button', 'aria-pressed':String(selPlan === p),
@@ -1459,7 +1534,9 @@
     else if (c.run) next.textContent = 'Training ' + pname(c.run.plan) + ' läuft seit ' + hhmm(c.run.startedAt) + ' Uhr.';
     else if (!done.length) next.textContent = 'Wähle deine Trainingsart und trage Gewicht und Wiederholungen je Satz ein.';
     else {
-      var last = done[done.length - 1], li = PLAN_ORDER.indexOf(last.plan);
+      var last = done[done.length - 1], lastRot = null;
+      for (var di = done.length - 1; di >= 0; di--) { if (PLAN_ORDER.indexOf(done[di].plan) >= 0) { lastRot = done[di]; break; } }
+      var li = lastRot ? PLAN_ORDER.indexOf(lastRot.plan) : -1;
       next.textContent = 'Zuletzt ' + pname(last.plan) + ' (' + fmtDate(last.date) + ').' + (li >= 0 ? ' Als Nächstes in der Reihe: ' + pname(PLAN_ORDER[(li + 1) % PLAN_ORDER.length]) + '.' : '');
     }
 
@@ -1468,7 +1545,7 @@
     ['T','H','K','E'].forEach(function(v){ $('#tab-' + v).setAttribute('aria-pressed', String(v === view)); });
     var tdy = sumDay(todayStr());
     $('#cnt-E').textContent = tdy.kcal > 0 ? fmtI(tdy.kcal) + ' kcal heute' : 'Essen · Schritte · Ziel';
-    $('#cnt-T').textContent = c.run ? 'läuft: ' + pname(c.run.plan) : (selPlan ? pname(selPlan) + ' gewählt' : 'Push · Pull · Leg');
+    $('#cnt-T').textContent = c.run ? 'läuft: ' + pname(c.run.plan) : (selPlan ? pname(selPlan) + ' gewählt' : '4 Kategorien');
     renderPicker(c);
     $('#cnt-H').textContent = loaded && done.length ? done.length + (done.length === 1 ? ' Einheit' : ' Einheiten') : 'Alle Trainings';
     var wl = weightList();
@@ -1497,10 +1574,13 @@
       nb.hidden = true; gb.hidden = true;
       if (!db) st.textContent = 'Der Speicher ist hier nicht verfügbar.';
       else if (!loaded) st.textContent = 'Lade Einheiten …';
-      else if (c.mode === 'pick') st.textContent = 'Wähle oben eine Trainingsart. Danach siehst du die Übungen und kannst das Training starten.';
+      else if (c.mode === 'pick') st.textContent = 'Wähle oben eine Kategorie. Danach siehst du die Übungen, wählst deine aus und startest das Training.';
       else {
-        st.textContent = 'Bereit für ' + pname(c.plan) + '? Mit dem Start beginnt die Zeit zu laufen.';
-        nb.hidden = false; nb.textContent = '+ Neues Training ' + pname(c.plan);
+        var chosen = selKeys(c.plan).length;
+        st.textContent = chosen
+          ? 'Bereit für ' + pname(c.plan) + ' mit ' + chosen + (chosen === 1 ? ' Übung' : ' Übungen') + '? Mit dem Start beginnt die Zeit zu laufen.'
+          : 'Setze oben bei mindestens einer Übung das grüne Häkchen. Danach kannst du starten.';
+        nb.hidden = false; nb.textContent = '+ Neues Training ' + pname(c.plan); nb.disabled = !chosen;
       }
     }
 
@@ -1571,16 +1651,17 @@
   async function newSession(){
     if (!db || view !== 'T' || !selPlan || runningSession()) return;
     var plan = selPlan;
+    var chosen = selKeys(plan);
+    if (!chosen.length) return;
     var same = sortedAll().filter(function(s){ return s.plan === plan; });
     var n = (same.length ? Math.max.apply(null, same.map(function(s){ return s.n || 0; })) : 0) + 1;
     var id = plan.toLowerCase() + '-' + pad(n);
     var now = Date.now();
     var data = {plan:plan, n:n, date:todayStr(), ts:now, startedAt:now, status:'running', entries:{}, edited:now};
-    if (custSel[plan]) data.exs = sortKeys(custSel[plan]);
+    data.exs = sortKeys(chosen, plan);
     setStatus('saving');
     try {
       await db.doc('sessions/' + id).set(data);
-      custSel[plan] = null;
       sessions[id] = data; notice = ''; confirmDel = false; confirmEnd = false;
       renderAll(); setStatus('saved');
     } catch (e) { setStatus('error'); }
@@ -1753,6 +1834,9 @@
     }, function(){});
     db.doc('plan/current').onSnapshot(function(snap){
       planDoc = snap.exists ? (snap.data() || null) : null; renderAll();
+    }, function(){});
+    db.doc('plan/exsel').onSnapshot(function(snap){
+      exSel = snap.exists ? (snap.data() || {}) : {}; renderAll();
     }, function(){});
     db.doc('plan/checks').onSnapshot(function(snap){
       planChecks = snap.exists ? (snap.data() || {}) : {}; renderAll();
