@@ -67,9 +67,14 @@
     ]}
   };
 
+  // Gruppen der Vorlage "Upper, Lower, Full Body": keine festen Übungen, die kommen aus dem eingelesenen Programm.
+  PLANS.upper = {name:'Upper', ex:[]};
+  PLANS.lower = {name:'Lower', ex:[]};
+  PLANS.full = {name:'Full Body', ex:[]};
+
   var PLAN_ORDER = ['push','pull','leg'];              // Reihenfolge für den Vorschlag "Als Nächstes"
   var PICK_ORDER = ['push','pull','leg','weak'];       // Kategorien zur Auswahl
-  var PLATE = {push:'PS', pull:'PL', leg:'LG', weak:'WP', A:'A', B:'B'};
+  var PLATE = {push:'PS', pull:'PL', leg:'LG', weak:'WP', upper:'UP', lower:'LO', full:'FB', A:'A', B:'B'};
   function pname(p){ return PLANS[p] ? PLANS[p].name : String(p); }
   function plate(p){ return PLATE[p] || String(p).slice(0,2).toUpperCase(); }
 
@@ -124,7 +129,7 @@
   var SHOW_NUTRI = false, SHOW_GIRTH = false;
   var food = {}, meals = {}, planDoc = null, planChecks = {}, nDate = null, mDelArm = null;
   // Programm (aus der eingelesenen Excel), Auswahl und Zustand
-  var program = {meta:null, weeks:{}}, progLoaded = false, progMsg = '', pgDelArm = false, progBusy = false, wpCand = null;
+  var program = {meta:null, weeks:{}}, progLoaded = false, progMsg = '', progKind = '', pgDelArm = false, progBusy = false, wpCand = null;
   var selDay = null, planState = {}, skips = {}, wpPick = {};
   var GROUPN = {push:'Push', pull:'Pull', leg:'Legs', weak:'Arms & Weak Points'};
 
@@ -157,6 +162,21 @@
     return null;
   }
   function dayRaw(w, d){ var wk = program.weeks[w]; return wk && wk.days && wk.days[d] && Array.isArray(wk.days[d].ex) ? wk.days[d].ex : []; }
+  function multiWeek(){ return progReady() && program.meta.weeks.length > 1; }
+  // Gruppen des Programms: bekannte (Push, Pull, Legs, Weak Points) zuerst in fester Reihenfolge, dann die übrigen
+  function progGroups(){
+    if (!progReady()) return [];
+    var out = [], seen = {}, names = program.meta.groups || {};
+    program.meta.days.forEach(function(d){
+      if (seen[d.group]) return;
+      seen[d.group] = 1;
+      out.push({id:d.group, name:names[d.group] || GROUPN[d.group] || (PLANS[d.group] && PLANS[d.group].name) || d.group});
+    });
+    var rank = function(x){ var i = PICK_ORDER.indexOf(x.id); return i < 0 ? 100 : i; };
+    return out.map(function(x, i){ return {x:x, i:i}; })
+      .sort(function(a, b){ return (rank(a.x) - rank(b.x)) || (a.i - b.i); })
+      .map(function(o){ return o.x; });
+  }
   function blockOf(w){
     var bl = progReady() ? program.meta.blocks || [] : [];
     for (var i = 0; i < bl.length; i++) if ((bl[i].weeks || []).indexOf(w) >= 0) return i + 1;
@@ -197,7 +217,7 @@
   }
   function sname(s){
     if (!s) return '';
-    if (s.dname) return s.dname + (s.prog && s.prog.w ? ' · Woche ' + s.prog.w : '');
+    if (s.dname) return s.dname + (s.prog && s.prog.w && !s.prog.one ? ' · Woche ' + s.prog.w : '');
     return pname(s.plan);
   }
   // Welche Übungen gelten gerade? Einheit mit Programm-Slots, Vorschau eines Programm-Tages oder alte Einheit.
@@ -764,7 +784,8 @@
         xbtn('y', inc, raw.n + ': mit in den Plan', false, function(){ pv ? setSkip(dayId, slug(raw.n), false) : setSlotInclude(c.id, i, raw, raw.n, true); }),
         xbtn('n', !inc, raw.n + ': auslassen', !!locked, function(){ pv ? setSkip(dayId, slug(raw.n), true) : setSlotInclude(c.id, i, raw, raw.n, false); }));
     }));
-    var n = cur.length, title = (dm ? dm.name : '') + ' · Woche ' + wk;
+    var oneWeek = pv ? !multiWeek() : !!(s && s.prog && s.prog.one);
+    var n = cur.length, title = (dm ? dm.name : '') + (oneWeek ? '' : ' · Woche ' + wk);
     var kids = pv ? [
       h('h2', {class:'sec', text:'Übungen · ' + title}),
       dm && dm.focus ? h('p', {class:'hint', text:dm.focus}) : null,
@@ -1736,16 +1757,22 @@
     box.hidden = !show; dbx.hidden = !(show && selPlan);
     if (!show) { box.replaceChildren(); dbx.replaceChildren(); return; }
     box.replaceChildren();
-    PICK_ORDER.forEach(function(p){
+    box.dataset.n = String(progGroups().length);
+    progGroups().forEach(function(grp){
+      var p = grp.id;
       var last = lastOf(function(x){ return x.prog && x.plan === p; });
       box.append(h('button', {class:'plan p' + p, type:'button', 'aria-pressed':String(selPlan === p),
           onclick:function(){ selPlan = p; selDay = nextDayForGroup(p); notice = ''; renderAll(); }},
         h('span', {class:'plate', text:plate(p), 'aria-hidden':'true'}),
-        h('span', {class:'ptxt'}, h('b', {text:GROUPN[p]}), h('small', {text:last ? 'zuletzt ' + fmtDate(last.date) : 'noch nie'}))));
+        h('span', {class:'ptxt'}, h('b', {text:grp.name}), h('small', {text:last ? 'zuletzt ' + fmtDate(last.date) : 'noch nie'}))));
     });
+    // Hat die Gruppe nur einen Tag mit demselben Namen (Upper, Lower, Full Body), ist die Tag-Auswahl überflüssig
+    var gdays = selPlan ? program.meta.days.filter(function(d){ return d.group === selPlan; }) : [];
+    var gname = selPlan ? (progGroups().filter(function(x){ return x.id === selPlan; })[0] || {}).name : '';
+    dbx.hidden = !(selPlan && gdays.length && !(gdays.length === 1 && gdays[0].name === gname));
     dbx.replaceChildren();
     if (selPlan) {
-      program.meta.days.filter(function(d){ return d.group === selPlan; }).forEach(function(d){
+      gdays.forEach(function(d){
         var last = lastOf(function(x){ return x.prog && x.prog.d === d.id; });
         dbx.append(h('button', {class:'plan dayb p' + selPlan, type:'button', 'aria-pressed':String(selDay === d.id),
             onclick:function(){ selDay = d.id; notice = ''; renderAll(); }},
@@ -1758,7 +1785,7 @@
   var weekSig = '';
   function renderWeekbar(c){
     var box = $('#weekbar');
-    var show = view === 'T' && progReady() && (c.mode === 'pick' || c.mode === 'preview');
+    var show = view === 'T' && multiWeek() && (c.mode === 'pick' || c.mode === 'preview');
     box.hidden = !show;
     if (!show) { weekSig = ''; box.replaceChildren(); return; }
     var w = curWeek(), sig = program.meta.importedAt + '|' + w;
@@ -1785,23 +1812,37 @@
   // ---------- Programm einlesen ----------
   async function importProgram(file){
     if (!file || progBusy) return;
-    progBusy = true; progMsg = 'Lese Datei …'; renderAll();
+    progBusy = true; progMsg = 'Lese Datei „' + String(file.name || '').slice(0, 60) + '“ …'; progKind = 'busy'; renderAll();
     try {
       if (!window.__xlsx || !window.__localdb) throw Object.assign(new Error('Einlesen ist hier nicht verfügbar.'), {user:true});
       var res = await window.__xlsx.parseProgram(await file.arrayBuffer());
       await window.__localdb.replaceCollection('program', res.docs);
       pgDelArm = false;
-      progMsg = 'Programm eingelesen: ' + res.weeks + ' Wochen, ' + res.days + ' Tage, ' + res.exercises + ' Übungen.';
+      var parts = [];
+      if (res.weeks > 1) parts.push(res.weeks + ' Wochen');
+      parts.push(res.days + (res.days === 1 ? ' Tag' : ' Tage'), res.exercises + ' Übungen');
+      progMsg = 'Programm eingelesen: ' + parts.join(', ') + '. Du findest es im Reiter Training.'; progKind = 'ok';
+      if (view === 'T') notice = 'Programm eingelesen: ' + parts.join(', ') + '.';
     } catch (e) {
-      progMsg = e && e.user ? e.message : 'Das Einlesen hat nicht geklappt. Es wurde nichts geändert.';
+      progMsg = e && e.user ? e.message : 'Das Einlesen hat nicht geklappt. Es wurde nichts geändert.'; progKind = 'err';
     } finally {
       progBusy = false; var fi = $('#prog-file'); if (fi) fi.value = '';
-      renderAll();
+      renderAll(); showProgMsg();
     }
   }
+  // Meldung in den sichtbaren Bereich holen, damit sie nicht unten in der Karte untergeht
+  function showProgMsg(){
+    var ms = document.querySelectorAll('.pmsg');
+    for (var i = 0; i < ms.length; i++) {
+      if (ms[i].offsetParent !== null && ms[i].scrollIntoView) { ms[i].scrollIntoView({block:'nearest'}); return; }
+    }
+  }
+  function msgEl(){
+    return h('p', {class:'pmsg ' + progKind, role:progKind === 'err' ? 'alert' : 'status', hidden:progMsg ? null : true, text:progMsg});
+  }
   async function removeProgram(){
-    try { await window.__localdb.replaceCollection('program', {}); progMsg = 'Programm entfernt. Deine bisherigen Einheiten bleiben erhalten.'; }
-    catch (e) { progMsg = 'Entfernen hat nicht geklappt.'; }
+    try { await window.__localdb.replaceCollection('program', {}); progMsg = 'Programm entfernt. Deine bisherigen Einheiten bleiben erhalten.'; progKind = 'ok'; }
+    catch (e) { progMsg = 'Entfernen hat nicht geklappt.'; progKind = 'err'; }
     pgDelArm = false; renderAll();
   }
   function pickFile(){ var fi = $('#prog-file'); if (fi && !progBusy) fi.click(); }
@@ -1813,16 +1854,16 @@
     box.replaceChildren(
       h('div', {class:'bh'}, h('h3', {text:'Programm einlesen'})),
       h('div', {class:'bb'},
-        h('p', {class:'hint', style:'margin-top:0', text:'Wähle deine Excel-Datei „Pure Bodybuilding – PPL“. Sie wird nur auf diesem Gerät gelesen und nirgends hochgeladen. Danach findest du Wochen, Tage, Übungen und Ersatzübungen hier in der App.'}),
+        h('p', {class:'hint', style:'margin-top:0', text:'Wähle deine Excel-Datei: „Pure Bodybuilding – PPL“ oder die Vorlage „Trainingsplan Upper, Lower, Full Body“. Sie wird nur auf diesem Gerät gelesen und nirgends hochgeladen. Danach findest du Tage, Übungen und Ersatzübungen hier in der App.'}),
         h('div', {class:'bactions'}, h('button', {class:'btn-new', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text:'Excel-Datei wählen'})),
-        h('p', {class:'hint', role:'status', style:'margin-bottom:0', text:progMsg})));
+        msgEl()));
   }
   function renderProgCard(){
     var box = $('#progcard');
     if (!box) return;
     var m = progReady() ? program.meta : null, kids = [];
     kids.push(h('p', {class:'hint', style:'margin-top:0', text: m
-      ? 'Eingelesen am ' + fmtDateFull(todayOf(m.importedAt)) + ': ' + m.weeks.length + ' Wochen, ' + m.days.length + ' Tage. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'
+      ? 'Eingelesen am ' + fmtDateFull(todayOf(m.importedAt)) + ': ' + (m.weeks.length > 1 ? m.weeks.length + ' Wochen, ' : '') + m.days.length + (m.days.length === 1 ? ' Tag' : ' Tage') + '. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'
       : 'Noch kein Programm eingelesen. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'}));
     var acts = [h('button', {class: m ? 'btn-sec' : 'btn-new', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text: m ? 'Neu einlesen' : 'Excel-Datei wählen'})];
     if (m && !pgDelArm) acts.push(h('button', {class:'link-btn', type:'button', text:'Programm entfernen', onclick:function(){ pgDelArm = true; renderAll(); }}));
@@ -1830,7 +1871,7 @@
       h('button', {class:'danger', type:'button', text:'Entfernen', onclick:removeProgram}),
       h('button', {class:'link-btn', type:'button', text:'Abbrechen', onclick:function(){ pgDelArm = false; renderAll(); }})));
     kids.push(h('div', {class:'bactions'}, acts));
-    kids.push(h('p', {class:'hint', role:'status', style:'margin-bottom:0', text:progMsg}));
+    kids.push(msgEl());
     box.replaceChildren(h('div', {class:'bh'}, h('h3', {text:'Programm'})), h('div', {class:'bb'}, kids));
   }
   function todayOf(ts){ var d = new Date(ts || Date.now()); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
@@ -1841,12 +1882,12 @@
     if (c.run) return 'Training ' + sname(c.run) + ' läuft seit ' + hhmm(c.run.startedAt) + ' Uhr.';
     if (!progReady()) return progLoaded ? 'Lies zuerst dein Programm ein, dann kannst du loslegen.' : '';
     var last = lastOf(function(x){ return !!x.prog; });
-    if (!last) return 'Stelle die Woche ein, wähle Gruppe und Tag und starte dein Training.';
+    if (!last) return multiWeek() ? 'Stelle die Woche ein, wähle Gruppe und Tag und starte dein Training.' : 'Wähle deine Einheit und starte dein Training.';
     var order = program.meta.days.map(function(d){ return d.id; }), li = order.indexOf(last.prog.d);
     var t = 'Zuletzt ' + sname(last) + ' (' + fmtDate(last.date) + ').';
     if (li >= 0) {
-      var nw = last.prog.w + (li + 1 >= order.length ? 1 : 0);
-      if (program.meta.weeks.indexOf(nw) >= 0) t += ' Als Nächstes laut Programm: ' + dayMeta(order[(li + 1) % order.length]).name + ' in Woche ' + nw + '.';
+      var multi = multiWeek(), nw = multi ? last.prog.w + (li + 1 >= order.length ? 1 : 0) : program.meta.weeks[0];
+      if (program.meta.weeks.indexOf(nw) >= 0) t += ' Als Nächstes laut Programm: ' + dayMeta(order[(li + 1) % order.length]).name + (multi ? ' in Woche ' + nw : '') + '.';
       else t += ' Das war der letzte Tag des Programms.';
     }
     return t;
@@ -1864,7 +1905,7 @@
     ['T','H','K','E'].forEach(function(v){ $('#tab-' + v).setAttribute('aria-pressed', String(v === view)); });
     var tdy = sumDay(todayStr());
     $('#cnt-E').textContent = tdy.kcal > 0 ? fmtI(tdy.kcal) + ' kcal heute' : 'Essen · Schritte · Ziel';
-    $('#cnt-T').textContent = c.run ? 'läuft: ' + (c.run.dname || pname(c.run.plan)) : (progReady() ? (selDay && dayMeta(selDay) ? dayMeta(selDay).name : 'Woche ' + curWeek()) : 'Programm einlesen');
+    $('#cnt-T').textContent = c.run ? 'läuft: ' + (c.run.dname || pname(c.run.plan)) : (progReady() ? (selDay && dayMeta(selDay) ? dayMeta(selDay).name : (multiWeek() ? 'Woche ' + curWeek() : 'Einheit wählen')) : 'Programm einlesen');
     renderPicker(c);
     renderWeekbar(c);
     renderProgBox(c);
@@ -1895,11 +1936,13 @@
       nb.hidden = true; gb.hidden = true;
       if (!db) st.textContent = 'Der Speicher ist hier nicht verfügbar.';
       else if (!loaded) st.textContent = 'Lade Einheiten …';
-      else if (c.mode === 'pick') st.textContent = 'Wähle oben die Woche, eine Gruppe und den Tag. Danach siehst du die Übungen und kannst das Training starten.';
+      else if (c.mode === 'pick') st.textContent = multiWeek()
+        ? 'Wähle oben die Woche, eine Gruppe und den Tag. Danach siehst du die Übungen und kannst das Training starten.'
+        : 'Wähle oben deine Einheit. Danach siehst du die Übungen und kannst das Training starten.';
       else {
         var chosen = previewList().length, dmn = dayMeta(selDay);
         st.textContent = chosen
-          ? 'Bereit für ' + dmn.name + ' (Woche ' + curWeek() + ') mit ' + chosen + (chosen === 1 ? ' Übung' : ' Übungen') + '? Mit dem Start beginnt die Zeit zu laufen.'
+          ? 'Bereit für ' + dmn.name + (multiWeek() ? ' (Woche ' + curWeek() + ')' : '') + ' mit ' + chosen + (chosen === 1 ? ' Übung' : ' Übungen') + '? Mit dem Start beginnt die Zeit zu laufen.'
           : 'Es ist keine Übung im Plan. Setze oben bei mindestens einer Übung das grüne Häkchen.';
         nb.hidden = false; nb.textContent = '+ Neues Training ' + dmn.name; nb.disabled = !chosen;
       }
@@ -1980,7 +2023,7 @@
     var now = Date.now();
     var slots = list.map(function(ex){ return {k:ex.k, n:ex.n, i:ex.i, s:0, w:ex.warm}; });
     var data = {plan:plan, n:n, date:todayStr(), ts:now, startedAt:now, status:'running', entries:{}, edited:now,
-      prog:{w:w, d:selDay}, dname:dm.name, slots:slots, exs:slots.map(function(x){ return x.k; })};
+      prog:multiWeek() ? {w:w, d:selDay} : {w:w, d:selDay, one:1}, dname:dm.name, slots:slots, exs:slots.map(function(x){ return x.k; })};
     if (dm.focus) data.dfocus = dm.focus;
     setStatus('saving');
     try {
@@ -2028,7 +2071,7 @@
       flushAll();
       view = v; userPicked = true; histId = null; histMode = null; histPick = null;
       var rn = runningSession(); if (v === 'T' && rn && PLANS[rn.plan]) selPlan = rn.plan;
-      confirmDel = false; confirmEnd = false; notice = '';
+      confirmDel = false; confirmEnd = false; notice = ''; progMsg = ''; progKind = '';
       renderAll();
     });
   });
@@ -2167,7 +2210,10 @@
         if (d.id === 'meta') m = x; else if (x && x.week) w[x.week] = x;
       });
       program = {meta:m, weeks:w}; progLoaded = true; wpCand = null;
+      var grps = progGroups();
+      grps.forEach(function(x){ if (!PLANS[x.id]) PLANS[x.id] = {name:x.name, ex:[]}; });
       if (selDay && !dayMeta(selDay)) selDay = null;
+      if (selPlan && !runningSession() && !grps.some(function(x){ return x.id === selPlan; })) { selPlan = null; selDay = null; }
       renderAll();
     }, function(){ progLoaded = true; renderAll(); });
     db.doc('plan/state').onSnapshot(function(snap){

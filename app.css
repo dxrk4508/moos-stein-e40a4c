@@ -36,8 +36,8 @@ body{
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--bg)}
 .app{max-width:640px;margin:0 auto;--tint:color-mix(in srgb,var(--accent) 9%,var(--surface))}
 .app[data-plan="B"],.app[data-plan="push"]{--accent:var(--plate-b)}
-.app[data-plan="leg"]{--accent:var(--plate-c)}
-.app[data-plan="weak"]{--accent:var(--plate-d)}
+.app[data-plan="leg"],.app[data-plan="lower"]{--accent:var(--plate-c)}
+.app[data-plan="weak"],.app[data-plan="full"]{--accent:var(--plate-d)}
 .app[data-plan="T"]{--accent:var(--ink)}
 .app[data-plan="H"],.app[data-plan="K"],.app[data-plan="E"]{--accent:var(--ink)}
 button{font:inherit;color:inherit;cursor:pointer}
@@ -67,8 +67,13 @@ h1{margin:0;font:700 34px/1 var(--f-display);letter-spacing:.02em;text-transform
 .pA{--c:var(--plate-a)}
 .pB,.ppush{--c:var(--plate-b)}
 .ppull{--c:var(--plate-a)}
-.pleg{--c:var(--plate-c)}
-.pweak{--c:var(--plate-d)}
+.pleg,.plower{--c:var(--plate-c)}
+.pweak,.pfull{--c:var(--plate-d)}
+.pupper{--c:var(--plate-a)}
+.pmsg{margin:12px 0 0;padding:10px 12px;border-radius:10px;border:1px solid var(--line,transparent);background:var(--tint);color:var(--ink);font-size:14px;font-weight:500}
+.pmsg[hidden]{display:none}
+.pmsg.ok{border-color:var(--ok);color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--surface))}
+.pmsg.err{border-color:var(--err);color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--surface))}
 .picker{margin-bottom:14px}
 .plate{
   flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
@@ -344,6 +349,7 @@ select.fin{
   .plan,.btn-new,.btn-sec{transition:background-color .15s,border-color .15s}
 }
 .picker.plans{grid-template-columns:repeat(2,minmax(0,1fr))}
+.picker.plans[data-n="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
 .picker .plan{grid-column:auto}
 .xsel{list-style:none;margin:6px 0 0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .xrow{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px;gap:8px;align-items:center;padding:6px 8px 6px 12px;border-top:1px solid var(--line)}

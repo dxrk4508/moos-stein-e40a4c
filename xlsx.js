@@ -171,7 +171,7 @@
     return isFinite(n) ? Math.min(3, Math.max(0, n)) : 1;
   }
   function topNum(reps) {   // höchster Wert eines einfachen Bereichs wie "10-12", sonst keiner
-    var m = /^(\d+)(?:\s*-\s*(\d+))?(?:\s*sec(?:onds?)?(?:\s*hold)?)?$/i.exec(reps.trim());
+    var m = /^(\d+)(?:\s*-\s*(\d+))?(?:\s*(?:sec(?:onds?)?|sek(?:unden)?\.?)(?:\s*hold)?)?$/i.exec(reps.trim());
     return m ? +(m[2] || m[1]) : null;
   }
 
@@ -248,7 +248,7 @@
         if (s1 || s2) ex.subs = [s1, s2].filter(Boolean);
       }
       var hi = topNum(reps); if (hi != null) ex.hi = hi;
-      if (/sec/i.test(reps)) ex.time = 1;
+      if (/sec|sek/i.test(reps)) ex.time = 1;
       list.push(ex);
     });
     var wnums = Object.keys(weeks).map(Number).sort(function (a, b) { return a - b; });
@@ -258,12 +258,76 @@
     return { title: title, blocks: blocks, weeks: weeks, wnums: wnums, days: dayOrder.map(function (id) { return daysMeta[id]; }), wnotes: wnotes, wp: wp, count: count };
   }
 
+  // Einfache Vorlage: ein Blatt mit den Spalten Tag, Übung, Aufwärmsätze, Arbeitssätze, Wiederholungen, Pause,
+  // Ersatzübung 1, Ersatzübung 2, Hinweis. Ohne Wochen. Der Tag steht nur in der ersten Zeile des Tages.
+  function simpleCols(rows, r) {
+    var hdr = rows[r] || {}, map = {};
+    Object.keys(hdr).forEach(function (c) {
+      var t = String(hdr[c]).toLowerCase().trim();
+      if (t === 'tag' || t === 'einheit') map.day = +c;
+      else if (t === 'übung' || t === 'uebung') map.name = +c;
+      else if (t.indexOf('aufw') === 0) map.warm = +c;
+      else if (t.indexOf('arbeits') === 0) map.sets = +c;
+      else if (t.indexOf('wiederh') === 0 || t === 'wdh' || t === 'wdh.') map.reps = +c;
+      else if (t === 'pause') map.rest = +c;
+      else if (/^ersatz\S*\s*1$/.test(t)) map.s1 = +c;
+      else if (/^ersatz\S*\s*2$/.test(t)) map.s2 = +c;
+      else if (t === 'hinweis' || t === 'notiz') map.note = +c;
+    });
+    return map.day && map.name && map.reps ? map : null;
+  }
+  function simpleGroup(label) {
+    var l = label.toLowerCase();
+    if (/^upper/.test(l)) return 'upper';
+    if (/^lower/.test(l)) return 'lower';
+    if (/^(full|ganzk)/.test(l)) return 'full';
+    return slug(label).slice(0, 20);
+  }
+  function parseSimple(rows) {
+    var rowNums = Object.keys(rows).map(Number).sort(function (a, b) { return a - b; });
+    var hr = null, cols = null;
+    for (var i = 0; i < rowNums.length && rowNums[i] <= 25 && !cols; i++) {
+      cols = simpleCols(rows, rowNums[i]);
+      if (cols) hr = rowNums[i];
+    }
+    if (!cols) return null;
+    var list = {}, daysMeta = [], groups = {}, perGroup = {}, cur = null, curLabel = '', count = 0;
+    rowNums.forEach(function (r) {
+      if (r <= hr) return;
+      var label = g(rows, r, cols.day).replace(/\s+/g, ' ').trim(), name = g(rows, r, cols.name).trim();
+      if (!name) return;
+      if (label && label !== curLabel && daysMeta.length < 14) {
+        var gr = simpleGroup(label), n = (perGroup[gr] = (perGroup[gr] || 0) + 1), id = gr + '-' + n;
+        if (!groups[gr]) groups[gr] = clean(label, 40);
+        daysMeta.push({ id: id, group: gr, name: clean(n === 1 ? label : label + ' ' + n, 40), focus: '' });
+        list[id] = []; cur = id; curLabel = label;
+      }
+      if (!cur || list[cur].length >= 30) return;
+      var reps = clean(g(rows, r, cols.reps), 40), warmRaw = cols.warm ? g(rows, r, cols.warm).trim() : '';
+      var ex = {
+        n: clean(name, 120), warm: warmRaw === '' ? 0 : warmCount(warmRaw),
+        sets: cols.sets ? clean(g(rows, r, cols.sets), 10) : '3', reps: reps, rest: cols.rest ? clean(g(rows, r, cols.rest), 24) : ''
+      };
+      var note = cols.note ? clean(g(rows, r, cols.note), 600) : '';
+      if (note) ex.note = note;
+      var s1 = cols.s1 ? clean(g(rows, r, cols.s1), 120) : '', s2 = cols.s2 ? clean(g(rows, r, cols.s2), 120) : '';
+      if (s1 || s2) ex.subs = [s1, s2].filter(Boolean);
+      var hi = topNum(reps); if (hi != null) ex.hi = hi;
+      if (/sec|sek/i.test(reps)) ex.time = 1;
+      list[cur].push(ex); count++;
+    });
+    if (!daysMeta.length || count < 3) return null;
+    var wk = { week: 1, block: 1, days: list };
+    return { format: 2, title: clean(g(rows, 1, 1), 120), blocks: [], weeks: { 1: wk }, wnums: [1], days: daysMeta, wnotes: {}, wp: [], groups: groups, count: count };
+  }
+
   // Aus dem Ergebnis die Dokumente für die Speicherung bauen: program/meta und program/wNN
   function toDocs(p) {
     var docs = {};
     docs['program/meta'] = {
-      format: 1, title: p.title, importedAt: Date.now(), weeks: p.wnums, blocks: p.blocks, days: p.days, wnotes: p.wnotes, wp: p.wp
+      format: p.format || 1, title: p.title, importedAt: Date.now(), weeks: p.wnums, blocks: p.blocks, days: p.days, wnotes: p.wnotes, wp: p.wp
     };
+    if (p.groups) docs['program/meta'].groups = p.groups;
     p.wnums.forEach(function (w) {
       var wk = p.weeks[w], days = {};
       Object.keys(wk.days).forEach(function (d) { days[d] = { ex: wk.days[d] }; });
@@ -274,8 +338,8 @@
 
   async function parseProgram(buf) {
     var zip = readZip(buf), sheets = await readSheets(zip), found = null;
-    for (var i = 0; i < sheets.length && !found; i++) found = parseSheet(sheets[i].cells);
-    if (!found) throw fail('Dieses Programm kenne ich nicht. Unterstützt wird die Datei "Pure Bodybuilding – PPL" mit den Wochen-Tabellen.');
+    for (var i = 0; i < sheets.length && !found; i++) found = parseSheet(sheets[i].cells) || parseSimple(sheets[i].cells);
+    if (!found) throw fail('Diese Datei kenne ich nicht. Unterstützt werden die Excel "Pure Bodybuilding – PPL" und die Vorlage "Trainingsplan Upper, Lower, Full Body" mit dem Blatt "Plan". Es wurde nichts geändert.');
     return { docs: toDocs(found), weeks: found.wnums.length, days: found.days.length, exercises: found.count };
   }
 
