@@ -129,7 +129,7 @@
   var SHOW_NUTRI = false, SHOW_GIRTH = false;
   var food = {}, meals = {}, planDoc = null, planChecks = {}, nDate = null, mDelArm = null;
   // Programm (aus der eingelesenen Excel), Auswahl und Zustand
-  var program = {meta:null, weeks:{}}, progLoaded = false, progMsg = '', progKind = '', pgDelArm = false, progBusy = false, wpCand = null;
+  var program = {meta:null, weeks:{}}, progLoaded = false, progMsg = '', progKind = '', presetArm = '', pgDelArm = false, progBusy = false, wpCand = null;
   var selDay = null, planState = {}, skips = {}, wpPick = {};
   var GROUPN = {push:'Push', pull:'Pull', leg:'Legs', weak:'Arms & Weak Points'};
 
@@ -1812,11 +1812,14 @@
   // ---------- Programm einlesen ----------
   async function importProgram(file){
     if (!file || progBusy) return;
-    progBusy = true; progMsg = 'Lese Datei „' + String(file.name || '').slice(0, 60) + '“ …'; progKind = 'busy'; renderAll();
+    if (blockedByRun()) { var f0 = $('#prog-file'); if (f0) f0.value = ''; return; }
+    progBusy = true; presetArm = ''; progMsg = 'Lese Datei „' + String(file.name || '').slice(0, 60) + '“ …'; progKind = 'busy'; renderAll();
+    var prev = progSource();
     try {
       if (!window.__xlsx || !window.__localdb) throw Object.assign(new Error('Einlesen ist hier nicht verfügbar.'), {user:true});
       var res = await window.__xlsx.parseProgram(await file.arrayBuffer());
       await window.__localdb.replaceCollection('program', res.docs);
+      if (prev !== 'xlsx') await resetPlanState();
       pgDelArm = false;
       var parts = [];
       if (res.weeks > 1) parts.push(res.weeks + ' Wochen');
@@ -1824,11 +1827,61 @@
       progMsg = 'Programm eingelesen: ' + parts.join(', ') + '. Du findest es im Reiter Training.'; progKind = 'ok';
       if (view === 'T') notice = 'Programm eingelesen: ' + parts.join(', ') + '.';
     } catch (e) {
-      progMsg = e && e.user ? e.message : 'Das Einlesen hat nicht geklappt. Es wurde nichts geändert.'; progKind = 'err';
+      progMsg = e && e.user ? e.message : 'Das Einlesen hat nicht geklappt. Es wurde nichts geändert. (' + errText(e) + ')'; progKind = 'err';
     } finally {
       progBusy = false; var fi = $('#prog-file'); if (fi) fi.value = '';
       renderAll(); showProgMsg();
     }
+  }
+  function errText(e){ return String(e && (e.name ? e.name + ': ' : '') + (e && e.message ? e.message : e)).slice(0, 120); }
+  // Wer das Programm wechselt, startet ohne alte Auslassungen und mit Woche 1. Verlauf und Einheiten bleiben immer erhalten.
+  function progSource(){ return progReady() ? (program.meta.preset || 'xlsx') : ''; }
+  async function resetPlanState(){
+    skips = {}; planState = {}; wpPick = {}; selPlan = null; selDay = null;
+    if (!db) return;
+    try { await db.doc('plan/skip').set({}); await db.doc('plan/state').set({}); } catch (e) { /* nicht kritisch */ }
+  }
+  function blockedByRun(){
+    if (!runningSession()) return false;
+    presetArm = ''; progMsg = 'Beende zuerst dein laufendes Training. Danach kannst du das Programm wechseln.'; progKind = 'err';
+    renderAll(); showProgMsg(); return true;
+  }
+  async function applyPreset(id){
+    if (progBusy || blockedByRun()) return;
+    progBusy = true; presetArm = ''; progMsg = ''; progKind = '';
+    var prev = progSource();
+    try {
+      if (!window.__presets || !window.__localdb) throw Object.assign(new Error('Voreinstellungen sind hier nicht verfügbar.'), {user:true});
+      var res = window.__presets.build(id);
+      await window.__localdb.replaceCollection('program', res.docs);
+      if (prev !== id) await resetPlanState();
+      pgDelArm = false;
+      var name = res.docs['program/meta'].title;
+      progMsg = 'Programm „' + name + '“ gewählt: ' + res.days + ' Tage, ' + res.exercises + ' Übungen. Du findest es im Reiter Training.'; progKind = 'ok';
+      if (view === 'T') notice = 'Programm „' + name + '“ gewählt.';
+    } catch (e) {
+      progMsg = e && e.user ? e.message : 'Das Programm konnte nicht gespeichert werden. Es wurde nichts geändert. (' + errText(e) + ')'; progKind = 'err';
+    } finally {
+      progBusy = false; renderAll(); showProgMsg();
+    }
+  }
+  // Auswahl der Voreinstellungen. Gibt es schon ein Programm, kommt vor dem Wechsel eine Rückfrage.
+  function presetList(m){
+    var cur = m && m.preset || '';
+    var list = window.__presets ? window.__presets.list : [];
+    return h('div', {class:'presets'}, list.map(function(p){
+      var active = cur === p.id;
+      if (presetArm === p.id) {
+        return h('div', {class:'preset armed'}, h('b', {text:p.name}),
+          h('small', {text:'Zu diesem Programm wechseln? Deine bisherigen Einheiten bleiben erhalten.'}),
+          h('span', {class:'confirm'},
+            h('button', {class:'btn-sec', type:'button', text:'Wechseln', onclick:function(){ applyPreset(p.id); }}),
+            h('button', {class:'link-btn', type:'button', text:'Abbrechen', onclick:function(){ presetArm = ''; renderAll(); }})));
+      }
+      return h('button', {class:'preset', type:'button', disabled:(progBusy || active) ? true : null, 'aria-pressed':String(active),
+          onclick:function(){ if (blockedByRun()) return; if (m) { presetArm = p.id; renderAll(); } else applyPreset(p.id); }},
+        h('b', {text:p.name + (active ? ' (aktiv)' : '')}), h('small', {text:p.info}));
+    }));
   }
   // Meldung in den sichtbaren Bereich holen, damit sie nicht unten in der Karte untergeht
   function showProgMsg(){
@@ -1852,20 +1905,26 @@
     box.hidden = !show;
     if (!show) { box.replaceChildren(); return; }
     box.replaceChildren(
-      h('div', {class:'bh'}, h('h3', {text:'Programm einlesen'})),
+      h('div', {class:'bh'}, h('h3', {text:'Programm wählen'})),
       h('div', {class:'bb'},
-        h('p', {class:'hint', style:'margin-top:0', text:'Wähle deine Excel-Datei: „Pure Bodybuilding – PPL“ oder die Vorlage „Trainingsplan Upper, Lower, Full Body“. Sie wird nur auf diesem Gerät gelesen und nirgends hochgeladen. Danach findest du Tage, Übungen und Ersatzübungen hier in der App.'}),
-        h('div', {class:'bactions'}, h('button', {class:'btn-new', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text:'Excel-Datei wählen'})),
+        h('p', {class:'hint', style:'margin-top:0', text:'Wähle ein fertiges Programm. Es liegt nur auf diesem Gerät und lässt sich später im Reiter Körper wechseln.'}),
+        presetList(null),
+        h('p', {class:'hint sep', text:'Oder lies deine eigene Excel-Datei ein:'}),
+        h('div', {class:'bactions'}, h('button', {class:'btn-sec', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text:'Excel-Datei wählen'})),
+        h('p', {class:'hint', text:'Unterstützt werden „Pure Bodybuilding – PPL“ und die Vorlage „Trainingsplan Upper, Lower, Full Body“. Die Datei wird nur auf diesem Gerät gelesen und nirgends hochgeladen.'}),
         msgEl()));
   }
   function renderProgCard(){
     var box = $('#progcard');
     if (!box) return;
     var m = progReady() ? program.meta : null, kids = [];
+    var nd = m ? m.days.length + (m.days.length === 1 ? ' Tag' : ' Tage') : '';
     kids.push(h('p', {class:'hint', style:'margin-top:0', text: m
-      ? 'Eingelesen am ' + fmtDateFull(todayOf(m.importedAt)) + ': ' + (m.weeks.length > 1 ? m.weeks.length + ' Wochen, ' : '') + m.days.length + (m.days.length === 1 ? ' Tag' : ' Tage') + '. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'
-      : 'Noch kein Programm eingelesen. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'}));
-    var acts = [h('button', {class: m ? 'btn-sec' : 'btn-new', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text: m ? 'Neu einlesen' : 'Excel-Datei wählen'})];
+      ? (m.preset ? 'Aktiv: Voreinstellung „' + m.title + '“ (' + nd + ').' : 'Eigene Excel eingelesen am ' + fmtDateFull(todayOf(m.importedAt)) + ': ' + (m.weeks.length > 1 ? m.weeks.length + ' Wochen, ' : '') + nd + '.') + ' Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'
+      : 'Noch kein Programm gewählt. Das Programm liegt nur auf diesem Gerät und ist nicht im Backup.'}));
+    kids.push(presetList(m));
+    kids.push(h('p', {class:'hint sep', text:'Oder lies deine eigene Excel-Datei ein:'}));
+    var acts = [h('button', {class:'btn-sec', type:'button', disabled:progBusy ? true : null, onclick:pickFile, text: m && !m.preset ? 'Neu einlesen' : 'Excel-Datei wählen'})];
     if (m && !pgDelArm) acts.push(h('button', {class:'link-btn', type:'button', text:'Programm entfernen', onclick:function(){ pgDelArm = true; renderAll(); }}));
     if (m && pgDelArm) acts.push(h('span', {class:'confirm'}, h('span', {text:'Programm wirklich entfernen?'}),
       h('button', {class:'danger', type:'button', text:'Entfernen', onclick:removeProgram}),
@@ -1880,7 +1939,7 @@
   function nextText(done, c){
     if (!loaded) return '';
     if (c.run) return 'Training ' + sname(c.run) + ' läuft seit ' + hhmm(c.run.startedAt) + ' Uhr.';
-    if (!progReady()) return progLoaded ? 'Lies zuerst dein Programm ein, dann kannst du loslegen.' : '';
+    if (!progReady()) return progLoaded ? 'Wähle zuerst ein Programm, dann kannst du loslegen.' : '';
     var last = lastOf(function(x){ return !!x.prog; });
     if (!last) return multiWeek() ? 'Stelle die Woche ein, wähle Gruppe und Tag und starte dein Training.' : 'Wähle deine Einheit und starte dein Training.';
     var order = program.meta.days.map(function(d){ return d.id; }), li = order.indexOf(last.prog.d);
@@ -1905,7 +1964,7 @@
     ['T','H','K','E'].forEach(function(v){ $('#tab-' + v).setAttribute('aria-pressed', String(v === view)); });
     var tdy = sumDay(todayStr());
     $('#cnt-E').textContent = tdy.kcal > 0 ? fmtI(tdy.kcal) + ' kcal heute' : 'Essen · Schritte · Ziel';
-    $('#cnt-T').textContent = c.run ? 'läuft: ' + (c.run.dname || pname(c.run.plan)) : (progReady() ? (selDay && dayMeta(selDay) ? dayMeta(selDay).name : (multiWeek() ? 'Woche ' + curWeek() : 'Einheit wählen')) : 'Programm einlesen');
+    $('#cnt-T').textContent = c.run ? 'läuft: ' + (c.run.dname || pname(c.run.plan)) : (progReady() ? (selDay && dayMeta(selDay) ? dayMeta(selDay).name : (multiWeek() ? 'Woche ' + curWeek() : 'Einheit wählen')) : 'Programm wählen');
     renderPicker(c);
     renderWeekbar(c);
     renderProgBox(c);
@@ -2071,7 +2130,7 @@
       flushAll();
       view = v; userPicked = true; histId = null; histMode = null; histPick = null;
       var rn = runningSession(); if (v === 'T' && rn && PLANS[rn.plan]) selPlan = rn.plan;
-      confirmDel = false; confirmEnd = false; notice = ''; progMsg = ''; progKind = '';
+      confirmDel = false; confirmEnd = false; notice = ''; progMsg = ''; progKind = ''; presetArm = '';
       renderAll();
     });
   });

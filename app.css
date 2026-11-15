@@ -350,6 +350,16 @@ select.fin{
 }
 .picker.plans{grid-template-columns:repeat(2,minmax(0,1fr))}
 .picker.plans[data-n="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
+.picker.plans[data-n="1"]{grid-template-columns:minmax(0,1fr)}
+.presets{display:grid;gap:8px;margin:10px 0 0}
+.preset{display:grid;gap:3px;width:100%;text-align:left;padding:12px 14px;min-height:56px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.preset b{font-size:16px;font-weight:600}
+.preset small{font-size:13px;line-height:1.35;color:var(--ink-2)}
+.preset[aria-pressed="true"]{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,var(--surface))}
+.preset:disabled{opacity:1}
+.preset.armed{border-color:var(--ink-2);background:var(--surface-2)}
+.hint.sep{margin-top:18px;margin-bottom:8px;font-weight:600;color:var(--ink)}
+.upd{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;margin:0 auto;max-width:616px;padding:14px 16px;border-radius:12px;border:0;background:var(--ink);color:var(--bg);font-weight:600;font-size:15px;box-shadow:0 4px 18px rgba(0,0,0,.25)}
 .picker .plan{grid-column:auto}
 .xsel{list-style:none;margin:6px 0 0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .xrow{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px;gap:8px;align-items:center;padding:6px 8px 6px 12px;border-top:1px solid var(--line)}
