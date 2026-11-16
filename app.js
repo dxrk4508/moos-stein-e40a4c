@@ -1846,6 +1846,18 @@
     presetArm = ''; progMsg = 'Beende zuerst dein laufendes Training. Danach kannst du das Programm wechseln.'; progKind = 'err';
     renderAll(); showProgMsg(); return true;
   }
+  // Wurde eine Voreinstellung in der App geändert, passt sich das gespeicherte Programm beim Start an (nie im laufenden Training)
+  var presetRefreshing = false;
+  function refreshPreset(){
+    if (presetRefreshing || !loaded || !progReady() || !program.meta.preset || !window.__presets || !window.__localdb || runningSession()) return;
+    var cur = window.__presets.list.filter(function(x){ return x.id === program.meta.preset; })[0];
+    if (!cur || cur.rev === (program.meta.rev || 1)) return;
+    presetRefreshing = true;
+    window.__localdb.replaceCollection('program', window.__presets.build(cur.id).docs)
+      .then(function(){ if (view === 'T') notice = 'Voreinstellung „' + cur.name + '“ wurde aktualisiert.'; })
+      .catch(function(){})
+      .then(function(){ presetRefreshing = false; renderAll(); });
+  }
   async function applyPreset(id){
     if (progBusy || blockedByRun()) return;
     progBusy = true; presetArm = ''; progMsg = ''; progKind = '';
@@ -2063,6 +2075,7 @@
   function onData(){
     var first = !loaded;
     loaded = true;
+    if (first) refreshPreset();
     if (first && !userPicked) {
       var run = runningSession();
       if (run && PLANS[run.plan]) { view = 'T'; selPlan = run.plan; if (run.prog) selDay = run.prog.d; }
@@ -2273,7 +2286,7 @@
       grps.forEach(function(x){ if (!PLANS[x.id]) PLANS[x.id] = {name:x.name, ex:[]}; });
       if (selDay && !dayMeta(selDay)) selDay = null;
       if (selPlan && !runningSession() && !grps.some(function(x){ return x.id === selPlan; })) { selPlan = null; selDay = null; }
-      renderAll();
+      renderAll(); refreshPreset();
     }, function(){ progLoaded = true; renderAll(); });
     db.doc('plan/state').onSnapshot(function(snap){
       planState = snap.exists ? (snap.data() || {}) : {}; renderAll();

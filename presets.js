@@ -47,12 +47,11 @@
 
   var PRESETS = [
     {
-      id: 'fullbody', name: 'Full Body', info: '3 Tage pro Woche, jedes Mal der ganze Körper (A, B, C). Gut für den Einstieg.',
+      id: 'fullbody', rev: 2, name: 'Full Body', info: 'Zwei Varianten, A und B, im Wechsel. Jedes Mal der ganze Körper. Gut für den Einstieg.',
       groups: { full: 'Full Body' },
       days: [
         { g: 'full', name: 'Full Body A', focus: 'Beine · Brust · Rücken', ex: [['Leg Press', 2, '8-12', '2-3 min'], ['Machine Chest Press', 1, '8-12', '2 min'], ['Lat Pulldown', 1, '8-12', '2 min'], ['Seated Leg Curl', 1, '10-12', '1-2 min'], ['Machine Shoulder Press', 1, '8-12', '2 min'], ['Cable Triceps Pressdown', 0, '10-12', '1-2 min'], ['Cable Crunch', 0, '12-15', '1 min']] },
-        { g: 'full', name: 'Full Body B', focus: 'Beine · Rücken · Hüfte', ex: [['Hack Squat Machine', 2, '8-12', '2-3 min'], ['Seated Cable Row', 1, '8-12', '2 min'], ['Cable Chest Press', 1, '10-12', '2 min'], ['Hip Thrust (Machine)', 1, '8-12', '2 min'], ['Cable Lateral Raise', 0, '12-15', '1 min'], ['Cable Biceps Curl', 1, '10-12', '1-2 min'], ['Standing Calf Raise', 1, '12-15', '1-2 min']] },
-        { g: 'full', name: 'Full Body C', focus: 'Beine · Brust · Rücken', ex: [['Smith Machine Squat', 2, '8-12', '2-3 min'], ['Machine Chest Press', 1, '10-12', '2 min'], ['Chest-Supported Machine Row', 1, '8-12', '2 min'], ['Lying Leg Curl', 1, '10-12', '2 min'], ['Reverse Pec Deck', 0, '12-15', '1 min'], ['Overhead Cable Triceps Extension', 0, '10-12', '1-2 min'], ['Plank', 0, '20-40 Sek.', '1 min']] }
+        { g: 'full', name: 'Full Body B', focus: 'Beine · Rücken · Hüfte', ex: [['Hack Squat Machine', 2, '8-12', '2-3 min'], ['Seated Cable Row', 1, '8-12', '2 min'], ['Cable Chest Press', 1, '10-12', '2 min'], ['Hip Thrust (Machine)', 1, '8-12', '2 min'], ['Cable Lateral Raise', 0, '12-15', '1 min'], ['Cable Biceps Curl', 1, '10-12', '1-2 min'], ['Standing Calf Raise', 1, '12-15', '1-2 min']] }
       ]
     },
     {
@@ -97,13 +96,13 @@
       count += d.ex.length;
     });
     var docs = {};
-    docs['program/meta'] = { format: 2, preset: p.id, title: p.name, importedAt: Date.now(), weeks: [1], blocks: [], days: days, wnotes: {}, wp: [], groups: p.groups };
+    docs['program/meta'] = { format: 2, preset: p.id, rev: p.rev || 1, title: p.name, importedAt: Date.now(), weeks: [1], blocks: [], days: days, wnotes: {}, wp: [], groups: p.groups };
     docs['program/w01'] = { week: 1, block: 1, days: list };
     return { docs: docs, weeks: 1, days: days.length, exercises: count };
   }
 
   window.__presets = {
-    list: PRESETS.map(function (p) { return { id: p.id, name: p.name, info: p.info, days: p.days.length }; }),
+    list: PRESETS.map(function (p) { return { id: p.id, rev: p.rev || 1, name: p.name, info: p.info, days: p.days.length }; }),
     build: build
   };
 })();
