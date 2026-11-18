@@ -37,10 +37,22 @@
     'Back Extension': ['Reverse Hyperextension', 'Cable Pull-Through', 'Rücken gerade halten, oben nicht überstrecken.'],
     'Cable Crunch': ['Ab Crunch Machine', 'Hanging Knee Raise', 'Rücken rund machen, die Bewegung kommt aus dem Bauch und nicht aus den Armen.'],
     'Ab Crunch Machine': ['Cable Crunch', 'Hanging Knee Raise', 'Langsam, die Bewegung kommt aus dem Bauch.'],
-    'Plank': ['Dead Bug', 'Cable Crunch', 'Körper gerade, Bauch und Gesäß anspannen. Sekunden halten, nicht Wiederholungen zählen.']
+    'Plank': ['Dead Bug', 'Cable Crunch', 'Körper gerade, Bauch und Gesäß anspannen. Sekunden halten, nicht Wiederholungen zählen.'],
+    // Push 2
+    'Incline Chest Press Machine': ['Smith Machine Incline Press', 'Incline Dumbbell Press', 'Sitz so einstellen, dass die Griffe auf Höhe der oberen Brust sind. Schulterblätter zusammen, kontrolliert absenken.'],
+    'Smith Machine Shoulder Press': ['Machine Shoulder Press', 'Dumbbell Shoulder Press', 'Stange auf Stirnhöhe starten, nicht ins Hohlkreuz gehen, oben die Ellbogen nicht ganz durchdrücken.'],
+    'Cable Fly': ['Pec Deck', 'Dumbbell Fly', 'Seilzug auf Brusthöhe oder etwas darunter, Arme leicht gebeugt, vor der Brust zusammenführen.'],
+    'Machine Lateral Raise': ['Cable Lateral Raise', 'Dumbbell Lateral Raise', 'Ellbogen leicht gebeugt, bis auf Schulterhöhe heben, ohne Schwung.'],
+    'Seated Dip Machine': ['Triceps Rope Pressdown', 'Overhead Cable Triceps Extension', 'Ellbogen nah am Körper, Schultern unten lassen, oben nicht ins Hohlkreuz gehen.'],
+    'Triceps Rope Pressdown': ['Cable Triceps Pressdown', 'Overhead Cable Triceps Extension', 'Seil unten leicht auseinanderziehen, Ellbogen am Körper fixieren.'],
+    // Pull 2
+    'Wide-Grip Seated Row': ['T-Bar Row', 'Chest-Supported Machine Row', 'Brust raus, Ellbogen weit zur Seite, Schulterblätter am Ende zusammenziehen. Lass 1-3 Wiederholungen in Reserve.'],
+    'Close-Grip Seated Row': ['Lat Pullover (Cable)', 'One-Arm Cable Row', 'Ellbogen eng am Körper nach hinten ziehen, unten die Dehnung zulassen. Lass 1-3 Wiederholungen in Reserve.'],
+    'Cable Curl': ['Preacher Curl', 'Dumbbell Curl', 'Ellbogen am Körper, ohne Schwung, oben kurz halten.'],
+    'Cable Hammer Curl': ['Cable Reverse Curl', 'Dumbbell Hammer Curl', 'Daumen zeigt nach oben, Ellbogen am Körper. Trainiert Bizeps und Unterarm.']
   };
 
-  // Eintrag: [Übung, Aufwärmsätze, Wiederholungen, Pause]
+  // Eintrag: [Übung, Aufwärmsätze, Wiederholungen, Pause, optional {s: Ersatzübungen, h: Hinweis}]
   var LEGS = [['Leg Press', 2, '8-12', '2-3 min'], ['Seated Leg Curl', 1, '10-12', '2 min'], ['Leg Extension', 1, '10-15', '1-2 min'],
     ['Hip Thrust (Machine)', 1, '8-12', '2 min'], ['Hip Abduction Machine', 0, '12-15', '1 min'], ['Standing Calf Raise', 1, '12-15', '1-2 min'],
     ['Cable Crunch', 0, '12-15', '1 min']];
@@ -65,20 +77,29 @@
       ]
     },
     {
-      id: 'ppl', name: 'Push / Pull / Legs', info: '3 Tage: Drücken, Ziehen, Beine. Wer mehr Zeit hat, geht die Reihe zweimal pro Woche durch.',
+      id: 'ppl', rev: 2, stack: true, name: 'Push / Pull / Legs', info: 'Push, Pull und Legs, jeweils in zwei Varianten (1 und 2). Im Wechsel: Push 1, Pull 1, Leg 1, danach Push 2, Pull 2, Leg 2.',
       groups: { push: 'Push', pull: 'Pull', leg: 'Legs' },
       days: [
-        { g: 'push', name: 'Push', focus: '', ex: [['Machine Chest Press', 2, '8-12', '2-3 min'], ['Cable Chest Press', 1, '10-12', '2 min'], ['Machine Shoulder Press', 1, '8-12', '2 min'], ['Cable Lateral Raise', 0, '12-15', '1 min'], ['Pec Deck', 0, '12-15', '1-2 min'], ['Cable Triceps Pressdown', 1, '10-12', '1-2 min'], ['Overhead Cable Triceps Extension', 0, '10-12', '1-2 min']] },
-        { g: 'pull', name: 'Pull', focus: '', ex: [['Lat Pulldown', 2, '8-12', '2-3 min'], ['Seated Cable Row', 1, '8-12', '2 min'], ['Chest-Supported Machine Row', 1, '10-12', '2 min'], ['Straight-Arm Cable Pulldown', 0, '12-15', '1-2 min'], ['Reverse Pec Deck', 0, '12-15', '1 min'], ['Cable Biceps Curl', 1, '10-12', '1-2 min'], ['Dumbbell Hammer Curl', 0, '10-12', '1-2 min']] },
-        { g: 'leg', name: 'Legs', focus: '', ex: LEGS }
+        { g: 'push', name: 'Push 1', focus: 'Brust · Schultern · Trizeps', ex: [['Machine Chest Press', 2, '8-12', '2-3 min'], ['Cable Chest Press', 1, '10-12', '2 min'], ['Machine Shoulder Press', 1, '8-12', '2 min'], ['Cable Lateral Raise', 0, '12-15', '1 min'], ['Pec Deck', 0, '12-15', '1-2 min'], ['Cable Triceps Pressdown', 1, '10-12', '1-2 min'], ['Overhead Cable Triceps Extension', 0, '10-12', '1-2 min']] },
+        { g: 'pull', name: 'Pull 1', focus: 'Rücken · hintere Schulter · Bizeps', ex: [['Lat Pulldown', 2, '8-12', '2-3 min'], ['Seated Cable Row', 1, '8-12', '2 min'], ['Chest-Supported Machine Row', 1, '10-12', '2 min'], ['Straight-Arm Cable Pulldown', 0, '12-15', '1-2 min'], ['Reverse Pec Deck', 0, '12-15', '1 min'], ['Cable Biceps Curl', 1, '10-12', '1-2 min'], ['Dumbbell Hammer Curl', 0, '10-12', '1-2 min']] },
+        { g: 'leg', name: 'Leg 1', focus: 'Beine · Waden · Bauch', ex: LEGS },
+        { g: 'push', name: 'Push 2', focus: 'Brust · Schultern · Trizeps', ex: [['Incline Chest Press Machine', 2, '8-12', '2-3 min'], ['Smith Machine Shoulder Press', 1, '8-12', '2 min'], ['Cable Fly', 0, '12-15', '1-2 min'], ['Machine Lateral Raise', 0, '12-15', '1 min'], ['Seated Dip Machine', 1, '8-12', '2 min'], ['Triceps Rope Pressdown', 0, '10-12', '1-2 min']] },
+        { g: 'pull', name: 'Pull 2', focus: 'Rücken · hintere Schulter · Arme', ex: [
+          ['Lat Pulldown', 2, '6-10', '2-3 min', { s: ['Assisted Pull-Up Machine', 'Neutral-Grip Lat Pulldown'], h: 'Zur oberen Brust ziehen, Ellbogen nach unten, nicht mit dem Rücken schwingen. Lass 1-3 Wiederholungen in Reserve.' }],
+          ['Wide-Grip Seated Row', 1, '6-10', '2-3 min'],
+          ['Close-Grip Seated Row', 1, '6-10', '2-3 min'],
+          ['Reverse Pec Deck', 1, '8-12', '1-2 min'],
+          ['Cable Curl', 1, '8-12', '1-2 min'],
+          ['Cable Hammer Curl', 0, '8-12', '1-2 min']] },
+        { g: 'leg', name: 'Leg 2', focus: 'Beine · Hüfte · Rücken', ex: [['Hack Squat Machine', 2, '8-12', '2-3 min'], ['Dumbbell Romanian Deadlift', 1, '8-12', '2 min'], ['Lying Leg Curl', 1, '10-12', '2 min'], ['Hip Adduction Machine', 0, '12-15', '1 min'], ['Seated Calf Raise', 1, '12-15', '1-2 min'], ['Back Extension', 0, '10-15', '1-2 min'], ['Ab Crunch Machine', 0, '12-15', '1 min']] }
       ]
     }
   ];
 
   function exObj(row) {
-    var lib = LIB[row[0]] || ['', '', ''], reps = row[2];
+    var lib = LIB[row[0]] || ['', '', ''], reps = row[2], o = row[4] || {};
     var m = /^(\d+)(?:\s*-\s*(\d+))?/.exec(reps);
-    var ex = { n: row[0], warm: row[1], sets: '3', reps: reps, rest: row[3], note: lib[2], subs: [lib[0], lib[1]].filter(Boolean) };
+    var ex = { n: row[0], warm: row[1], sets: '3', reps: reps, rest: row[3], note: o.h || lib[2], subs: (o.s || [lib[0], lib[1]]).filter(Boolean) };
     if (m) ex.hi = +(m[2] || m[1]);
     if (/sek/i.test(reps)) ex.time = 1;
     return ex;
@@ -97,6 +118,7 @@
     });
     var docs = {};
     docs['program/meta'] = { format: 2, preset: p.id, rev: p.rev || 1, title: p.name, importedAt: Date.now(), weeks: [1], blocks: [], days: days, wnotes: {}, wp: [], groups: p.groups };
+    if (p.stack) docs['program/meta'].stack = true;
     docs['program/w01'] = { week: 1, block: 1, days: list };
     return { docs: docs, weeks: 1, days: days.length, exercises: count };
   }

@@ -1771,6 +1771,7 @@
     var gname = selPlan ? (progGroups().filter(function(x){ return x.id === selPlan; })[0] || {}).name : '';
     dbx.hidden = !(selPlan && gdays.length && !(gdays.length === 1 && gdays[0].name === gname));
     dbx.replaceChildren();
+    dbx.classList.toggle('stack', !!program.meta.stack);   // PPL: Tag 1 und 2 untereinander
     if (selPlan) {
       gdays.forEach(function(d){
         var last = lastOf(function(x){ return x.prog && x.prog.d === d.id; });
