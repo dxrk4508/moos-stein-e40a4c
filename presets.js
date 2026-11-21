@@ -11,15 +11,15 @@
     'Smith Machine Squat': ['Leg Press', 'Goblet Squat', 'Füße leicht vor der Stange, Rücken gerade, Knie stabil.'],
     'Machine Chest Press': ['Cable Chest Press', 'Dumbbell Bench Press', 'Schulterblätter zusammen, Gewicht kontrolliert absenken (ca. 2 Sek.).'],
     'Cable Chest Press': ['Machine Chest Press', 'Incline Push-Up', 'Fester Stand, Rumpf angespannt, vor der Brust zusammenführen.'],
-    'Pec Deck': ['Cable Fly', 'Dumbbell Fly', 'Ellbogen leicht gebeugt, unten die Dehnung spüren.'],
+    'Pec Deck': ['Cable Fly', 'Dumbbell Fly', 'Butterfly für die Brust. An der Dual-Maschine Sitz und Griffe nach vorn einstellen, Ellbogen leicht gebeugt, unten die Dehnung spüren.'],
     'Lat Pulldown': ['Neutral-Grip Lat Pulldown', 'Assisted Pull-Up Machine', 'Zur oberen Brust ziehen, Ellbogen nach unten, nicht mit dem Rücken schwingen.'],
     'Neutral-Grip Lat Pulldown': ['Lat Pulldown', 'Assisted Pull-Up Machine', 'Ellbogen zu den Hüften führen.'],
     'Seated Cable Row': ['Chest-Supported Machine Row', 'One-Arm Dumbbell Row', 'Brust raus, Schulterblätter am Ende zusammenziehen.'],
     'Chest-Supported Machine Row': ['Seated Cable Row', 'One-Arm Dumbbell Row', 'Brust am Polster lassen, Schulterblätter zusammenziehen.'],
     'Straight-Arm Cable Pulldown': ['Lat Pulldown', 'Dumbbell Pullover', 'Arme fast gestreckt, aus dem breiten Rückenmuskel nach unten ziehen.'],
     'Machine Shoulder Press': ['Dumbbell Shoulder Press', 'Smith Machine Shoulder Press', 'Rücken am Polster lassen, nicht ins Hohlkreuz gehen.'],
-    'Cable Lateral Raise': ['Dumbbell Lateral Raise', 'Machine Lateral Raise', 'Leichtes Gewicht, Ellbogen leicht gebeugt, bis auf Schulterhöhe heben.'],
-    'Reverse Pec Deck': ['Cable Reverse Fly', 'Face Pull', 'Leichtes Gewicht, die hinteren Schultern arbeiten lassen.'],
+    'Cable Lateral Raise': ['Dumbbell Lateral Raise', 'Machine Lateral Raise', 'Seitheben am Kabelzug. Leichtes Gewicht, Ellbogen leicht gebeugt, bis auf Schulterhöhe heben.'],
+    'Reverse Pec Deck': ['Cable Reverse Fly', 'Face Pull', 'Butterfly rückwärts für die hintere Schulter. An der Dual-Maschine Griffe nach hinten stellen, Brust am Polster, leichtes Gewicht.'],
     'Cable Triceps Pressdown': ['Overhead Cable Triceps Extension', 'Machine Dip', 'Ellbogen am Körper fixieren.'],
     'Overhead Cable Triceps Extension': ['Cable Triceps Pressdown', 'Dumbbell Overhead Extension', 'Ellbogen zeigen nach vorn, die Arme nicht auseinanderfallen lassen.'],
     'Cable Biceps Curl': ['Dumbbell Curl', 'Preacher Curl Machine', 'Ohne Schwung, oben kurz halten.'],
@@ -34,15 +34,16 @@
     'Hip Adduction Machine': ['Cable Hip Adduction', 'Sumo Leg Press', 'Kontrolliert zusammenführen, nicht mit Schwung.'],
     'Standing Calf Raise': ['Seated Calf Raise', 'Leg Press Calf Raise', 'Unten voll dehnen, oben 1 Sek. halten.'],
     'Seated Calf Raise': ['Standing Calf Raise', 'Leg Press Calf Raise', 'Unten voll dehnen, oben kurz halten.'],
-    'Back Extension': ['Reverse Hyperextension', 'Cable Pull-Through', 'Rücken gerade halten, oben nicht überstrecken.'],
+    'Back Extension': ['Reverse Hyperextension', 'Cable Pull-Through', 'Rückenstrecker. Rücken gerade halten, aus der Hüfte aufrichten, oben nicht überstrecken.'],
     'Cable Crunch': ['Ab Crunch Machine', 'Hanging Knee Raise', 'Rücken rund machen, die Bewegung kommt aus dem Bauch und nicht aus den Armen.'],
     'Ab Crunch Machine': ['Cable Crunch', 'Hanging Knee Raise', 'Langsam, die Bewegung kommt aus dem Bauch.'],
     'Plank': ['Dead Bug', 'Cable Crunch', 'Körper gerade, Bauch und Gesäß anspannen. Sekunden halten, nicht Wiederholungen zählen.'],
+    'T-Bar Row': ['Chest-Supported Machine Row', 'One-Arm Dumbbell Row', 'Brust raus, Rücken gerade, Ellbogen nah am Körper nach hinten ziehen, Schulterblätter am Ende zusammenziehen. Gewicht anfangs lieber leicht.'],
     // Push 2
     'Incline Chest Press Machine': ['Smith Machine Incline Press', 'Incline Dumbbell Press', 'Sitz so einstellen, dass die Griffe auf Höhe der oberen Brust sind. Schulterblätter zusammen, kontrolliert absenken.'],
     'Smith Machine Shoulder Press': ['Machine Shoulder Press', 'Dumbbell Shoulder Press', 'Stange auf Stirnhöhe starten, nicht ins Hohlkreuz gehen, oben die Ellbogen nicht ganz durchdrücken.'],
     'Cable Fly': ['Pec Deck', 'Dumbbell Fly', 'Seilzug auf Brusthöhe oder etwas darunter, Arme leicht gebeugt, vor der Brust zusammenführen.'],
-    'Machine Lateral Raise': ['Cable Lateral Raise', 'Dumbbell Lateral Raise', 'Ellbogen leicht gebeugt, bis auf Schulterhöhe heben, ohne Schwung.'],
+    'Machine Lateral Raise': ['Cable Lateral Raise', 'Dumbbell Lateral Raise', 'Seitheben an der Maschine. Ellbogen leicht gebeugt, bis auf Schulterhöhe heben, ohne Schwung.'],
     'Seated Dip Machine': ['Triceps Rope Pressdown', 'Overhead Cable Triceps Extension', 'Ellbogen nah am Körper, Schultern unten lassen, oben nicht ins Hohlkreuz gehen.'],
     'Triceps Rope Pressdown': ['Cable Triceps Pressdown', 'Overhead Cable Triceps Extension', 'Seil unten leicht auseinanderziehen, Ellbogen am Körper fixieren.'],
     // Pull 2
@@ -59,7 +60,7 @@
 
   var PRESETS = [
     {
-      id: 'fullbody', rev: 2, name: 'Full Body', info: 'Zwei Varianten, A und B, im Wechsel. Jedes Mal der ganze Körper. Gut für den Einstieg.',
+      id: 'fullbody', rev: 3, name: 'Full Body', info: 'Zwei Varianten, A und B, im Wechsel. Jedes Mal der ganze Körper. Gut für den Einstieg.',
       groups: { full: 'Full Body' },
       days: [
         { g: 'full', name: 'Full Body A', focus: 'Beine · Brust · Rücken', ex: [['Leg Press', 2, '8-12', '2-3 min'], ['Machine Chest Press', 1, '8-12', '2 min'], ['Lat Pulldown', 1, '8-12', '2 min'], ['Seated Leg Curl', 1, '10-12', '1-2 min'], ['Machine Shoulder Press', 1, '8-12', '2 min'], ['Cable Triceps Pressdown', 0, '10-12', '1-2 min'], ['Cable Crunch', 0, '12-15', '1 min']] },
@@ -67,7 +68,7 @@
       ]
     },
     {
-      id: 'upperlower', name: 'Upper / Lower', info: '4 Tage pro Woche: Oberkörper, Unterkörper, Oberkörper, Unterkörper.',
+      id: 'upperlower', rev: 2, name: 'Upper / Lower', info: '4 Tage pro Woche: Oberkörper, Unterkörper, Oberkörper, Unterkörper.',
       groups: { upper: 'Upper', lower: 'Lower' },
       days: [
         { g: 'upper', name: 'Upper A', focus: 'Brust · Rücken · Schultern', ex: [['Machine Chest Press', 2, '8-12', '2-3 min'], ['Lat Pulldown', 1, '8-12', '2-3 min'], ['Machine Shoulder Press', 1, '8-12', '2 min'], ['Seated Cable Row', 0, '8-12', '2 min'], ['Pec Deck', 0, '12-15', '1-2 min'], ['Cable Triceps Pressdown', 1, '10-12', '1-2 min'], ['Cable Biceps Curl', 1, '10-12', '1-2 min']] },
@@ -77,11 +78,11 @@
       ]
     },
     {
-      id: 'ppl', rev: 2, stack: true, name: 'Push / Pull / Legs', info: 'Push, Pull und Legs, jeweils in zwei Varianten (1 und 2). Im Wechsel: Push 1, Pull 1, Leg 1, danach Push 2, Pull 2, Leg 2.',
+      id: 'ppl', rev: 3, stack: true, name: 'Push / Pull / Legs', info: 'Push, Pull und Legs, jeweils in zwei Varianten (1 und 2). Im Wechsel: Push 1, Pull 1, Leg 1, danach Push 2, Pull 2, Leg 2.',
       groups: { push: 'Push', pull: 'Pull', leg: 'Legs' },
       days: [
         { g: 'push', name: 'Push 1', focus: 'Brust · Schultern · Trizeps', ex: [['Machine Chest Press', 2, '8-12', '2-3 min'], ['Cable Chest Press', 1, '10-12', '2 min'], ['Machine Shoulder Press', 1, '8-12', '2 min'], ['Cable Lateral Raise', 0, '12-15', '1 min'], ['Pec Deck', 0, '12-15', '1-2 min'], ['Cable Triceps Pressdown', 1, '10-12', '1-2 min'], ['Overhead Cable Triceps Extension', 0, '10-12', '1-2 min']] },
-        { g: 'pull', name: 'Pull 1', focus: 'Rücken · hintere Schulter · Bizeps', ex: [['Lat Pulldown', 2, '8-12', '2-3 min'], ['Seated Cable Row', 1, '8-12', '2 min'], ['Chest-Supported Machine Row', 1, '10-12', '2 min'], ['Straight-Arm Cable Pulldown', 0, '12-15', '1-2 min'], ['Reverse Pec Deck', 0, '12-15', '1 min'], ['Cable Biceps Curl', 1, '10-12', '1-2 min'], ['Dumbbell Hammer Curl', 0, '10-12', '1-2 min']] },
+        { g: 'pull', name: 'Pull 1', focus: 'Rücken · hintere Schulter · Bizeps', ex: [['Lat Pulldown', 2, '8-12', '2-3 min'], ['Seated Cable Row', 1, '8-12', '2 min'], ['T-Bar Row', 1, '8-12', '2 min'], ['Straight-Arm Cable Pulldown', 0, '12-15', '1-2 min'], ['Reverse Pec Deck', 0, '12-15', '1 min'], ['Cable Biceps Curl', 1, '10-12', '1-2 min'], ['Dumbbell Hammer Curl', 0, '10-12', '1-2 min'], ['Back Extension', 0, '10-15', '1-2 min']] },
         { g: 'leg', name: 'Leg 1', focus: 'Beine · Waden · Bauch', ex: LEGS },
         { g: 'push', name: 'Push 2', focus: 'Brust · Schultern · Trizeps', ex: [['Incline Chest Press Machine', 2, '8-12', '2-3 min'], ['Smith Machine Shoulder Press', 1, '8-12', '2 min'], ['Cable Fly', 0, '12-15', '1-2 min'], ['Machine Lateral Raise', 0, '12-15', '1 min'], ['Seated Dip Machine', 1, '8-12', '2 min'], ['Triceps Rope Pressdown', 0, '10-12', '1-2 min']] },
         { g: 'pull', name: 'Pull 2', focus: 'Rücken · hintere Schulter · Arme', ex: [
